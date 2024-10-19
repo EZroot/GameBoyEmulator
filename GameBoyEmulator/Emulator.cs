@@ -2,31 +2,41 @@ using GameBoyEmulator.Processor;
 using GameBoyEmulator.Memory;
 using System.Drawing;
 using System.Text;
+using GameBoyEmulator.Interrupts;
+using GameBoyEmulator.Graphics;
 
 namespace GameBoyEmulator
 {
-    internal class Emulator
+    public class Emulator
     {
         private CPU _cpu;
         private Registers _registry;
         private Opcode _opcode;
-        private RAM _memory;
+        private MemoryMap _memoryMap;
+        private RAM _ram;
+        private MMU _mmu;
         private PPU _ppu;
+        private Renderer _renderer;
+        private InterruptController _interruptController;
         private Timer _timer;
         private const int CyclesPerFrame = 70224;
         private bool DebugFrameStepThroughPerFrame = false;
         private bool DebugFrameStepThroughPerCycle = false;
-        private bool GoFast = false; //Skips frames when renderering to speed up cpu cycles
+        private bool GoFast = true; //Skips frames when renderering to speed up cpu cycles
         private const int ScreenWidth = 160;
         private const int ScreenHeight = 144;
         public Emulator()
         {
             _registry = new Registers();
-            _memory = new RAM(_registry);
-            _opcode = new Opcode(_registry,_memory);
-            _cpu = new CPU(_registry, _opcode, _memory);
-            _ppu = new PPU(_memory);
-            _timer = new Timer(_memory);
+            _ram = new RAM();
+            _timer = new Timer(_ram);
+            _memoryMap = new MemoryMap(_ram);
+            _mmu = new MMU(_registry, _ram);
+            _renderer = new Renderer(_mmu);
+            _ppu = new PPU(_mmu, _renderer);
+            _opcode = new Opcode(_registry, _mmu, _ram);
+            _interruptController = new InterruptController(_registry, _mmu, _ram);
+            _cpu = new CPU(_registry, _opcode, _ram, _interruptController);
             InitializeHardwareRegisters();
         }
         public void Run()
@@ -71,7 +81,7 @@ namespace GameBoyEmulator
                 {
                     if (keyMappings[key].isPressed)
                     {
-                        _memory.SetJoypadButtonState(keyMappings[key].buttonIndex, true);
+                        _mmu.SetJoypadButtonState(keyMappings[key].buttonIndex, true);
                         if (keyMappings[key].frameCounter > 0)
                         {
                             keyMappings[key] = (keyMappings[key].buttonIndex, true, keyMappings[key].frameCounter - 1);
@@ -79,12 +89,12 @@ namespace GameBoyEmulator
                         else
                         {
                             keyMappings[key] = (keyMappings[key].buttonIndex, false, 0);
-                            _memory.SetJoypadButtonState(keyMappings[key].buttonIndex, false);
+                            _mmu.SetJoypadButtonState(keyMappings[key].buttonIndex, false);
                         }
                     }
                     else
                     {
-                        _memory.SetJoypadButtonState(keyMappings[key].buttonIndex, false);
+                        _mmu.SetJoypadButtonState(keyMappings[key].buttonIndex, false);
                     }
                 }
                 Thread.Sleep(16);
@@ -107,7 +117,7 @@ namespace GameBoyEmulator
         }
         public void RenderScreen()
         {
-            byte[,] screenBuffer = _ppu.GetScreenBuffer();
+            byte[,] screenBuffer = _renderer.GetScreenBuffer();
             StringBuilder outputBuilder = new StringBuilder(ScreenHeight * (ScreenWidth + 1));
             for (int y = 0; y < ScreenHeight; y++)
             {
@@ -181,22 +191,22 @@ namespace GameBoyEmulator
         }
         private void InitializeHardwareRegisters()
         {
-            _memory.WriteByte(0xFF40, 0x91);
-            _memory.WriteByte(0xFF41, 0x85);
-            _memory.WriteByte(0xFF42, 0x00);
-            _memory.WriteByte(0xFF43, 0x00);
-            _memory.WriteByte(0xFF44, 0x00);
-            _memory.WriteByte(0xFF45, 0x00);
-            _memory.WriteByte(0xFF4A, 0x00);
-            _memory.WriteByte(0xFF4B, 0x00);
-            _memory.WriteByte(0xFF46, 0xFF);
-            _memory.WriteByte(0xFFFF, 0x00);
-            _memory.WriteByte(0xFF0F, 0xE1);
-            _memory.WriteByte(0xFF04, 0x00);
-            _memory.WriteByte(0xFF05, 0x00);
-            _memory.WriteByte(0xFF06, 0x00);
-            _memory.WriteByte(0xFF07, 0x00);
-            _memory.WriteByte(0xFF26, 0xF1);
+            _mmu.WriteByte(0xFF40, 0x91);
+            _mmu.WriteByte(0xFF41, 0x85);
+            _mmu.WriteByte(0xFF42, 0x00);
+            _mmu.WriteByte(0xFF43, 0x00);
+            _mmu.WriteByte(0xFF44, 0x00);
+            _mmu.WriteByte(0xFF45, 0x00);
+            _mmu.WriteByte(0xFF4A, 0x00);
+            _mmu.WriteByte(0xFF4B, 0x00);
+            _mmu.WriteByte(0xFF46, 0xFF);
+            _mmu.WriteByte(0xFFFF, 0x00);
+            _mmu.WriteByte(0xFF0F, 0xE1);
+            _mmu.WriteByte(0xFF04, 0x00);
+            _mmu.WriteByte(0xFF05, 0x00);
+            _mmu.WriteByte(0xFF06, 0x00);
+            _mmu.WriteByte(0xFF07, 0x00);
+            _mmu.WriteByte(0xFF26, 0xF1);
         }
         public void LoadROM(string filePath)
         {
@@ -216,7 +226,7 @@ namespace GameBoyEmulator
             Console.WriteLine($"ROM loaded: {romData.Length} bytes into memory.");
             Console.WriteLine($"ROM size from header: {romSize / 1024} KB");
             Thread.Sleep(5000);
-            _memory.LoadROM(romData);
+            _memoryMap.LoadROM(romData);
         }
         private int GetROMSize(int romSizeCode, byte[] romData)
         {
@@ -276,7 +286,7 @@ namespace GameBoyEmulator
             };
             for (int i = 0; i < testTile.Length; i++)
             {
-                _memory.WriteByte((ushort)(tileDataStart + i), testTile[i]);
+                _mmu.WriteByte((ushort)(tileDataStart + i), testTile[i]);
             }
         }
     }

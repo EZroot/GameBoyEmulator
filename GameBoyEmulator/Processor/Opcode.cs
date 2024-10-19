@@ -3,16 +3,18 @@ using GameBoyEmulator.Memory;
 
 namespace GameBoyEmulator.Processor
 {
-    internal class Opcode
+    public class Opcode
     {
         Registers _registers;
         RAM _ram;
+        MMU _mmu;
 
         private bool DebugMode = false;
-        public Opcode(Registers registers, RAM ram) 
+        public Opcode(Registers registers, MMU mmu, RAM ram) 
         {
             this._registers = registers;
             this._ram = ram;
+            this._mmu = mmu;
             Logger.Log("Opcode initialized.");
         }
 
@@ -106,10 +108,10 @@ namespace GameBoyEmulator.Processor
                     cycles = 4;
                     break;
                 case 0x8C:
-                    int temp = _registers.A + _registers.H + (_registers.IsFlagSet(_registers.CarryFlag) ? 1 : 0);
+                    int temp = _registers.A + _registers.H + (_registers.IsFlagSet(Registers.CarryFlag) ? 1 : 0);
                     _registers.SetZeroFlag((temp & 0xFF) == 0);
                     _registers.SetNegativeFlag(false);
-                    _registers.SetHalfCarryFlag((_registers.A & 0xF) + (_registers.H & 0xF) + (_registers.IsFlagSet(_registers.CarryFlag) ? 1 : 0) > 0xF);
+                    _registers.SetHalfCarryFlag((_registers.A & 0xF) + (_registers.H & 0xF) + (_registers.IsFlagSet(Registers.CarryFlag) ? 1 : 0) > 0xF);
                     _registers.SetCarryFlag(temp > 0xFF);
                     _registers.A = (byte)temp;
                     cycles = 4;
@@ -249,7 +251,7 @@ namespace GameBoyEmulator.Processor
                     }
                 case 0x9B:
                     {
-                        int zvvzx = _registers.IsFlagSet(_registers.CarryFlag) ? 1 : 0;
+                        int zvvzx = _registers.IsFlagSet(Registers.CarryFlag) ? 1 : 0;
                         int cczxc = _registers.A - _registers.E - zvvzx;
                         _registers.SetZeroFlag((cczxc & 0xFF) == 0);
                         _registers.SetNegativeFlag(true);
@@ -287,7 +289,7 @@ namespace GameBoyEmulator.Processor
                     }
                 case 0x98:
                     {
-                        int zxzvxz = _registers.IsFlagSet(_registers.CarryFlag) ? 1 : 0;
+                        int zxzvxz = _registers.IsFlagSet(Registers.CarryFlag) ? 1 : 0;
                         int vzvzvz = _registers.A - _registers.B - zxzvxz;
                         _registers.SetZeroFlag((vzvzvz & 0xFF) == 0);
                         _registers.SetNegativeFlag(true);
@@ -301,7 +303,7 @@ namespace GameBoyEmulator.Processor
                     {
                         ushort nnnnn = _ram.ReadWord(_registers.PC);
                         _registers.PC += 2;
-                        if (!_registers.IsFlagSet(_registers.CarryFlag))
+                        if (!_registers.IsFlagSet(Registers.CarryFlag))
                         {
                             _registers.PC = nnnnn;
                             cycles = 16;
@@ -314,7 +316,7 @@ namespace GameBoyEmulator.Processor
                     }
                 case 0x8A:
                     {
-                        int caaa = _registers.IsFlagSet(_registers.CarryFlag) ? 1 : 0;
+                        int caaa = _registers.IsFlagSet(Registers.CarryFlag) ? 1 : 0;
                         int vvvv = _registers.A + _registers.D + caaa;
                         _registers.SetZeroFlag((vvvv & 0xFF) == 0);
                         _registers.ClearNegativeFlag();
@@ -326,7 +328,7 @@ namespace GameBoyEmulator.Processor
                     }
                 case 0x8B:
                     {
-                        int bbg = _registers.IsFlagSet(_registers.CarryFlag) ? 1 : 0;
+                        int bbg = _registers.IsFlagSet(Registers.CarryFlag) ? 1 : 0;
                         int bhb = _registers.A + _registers.E + bbg;
                         _registers.SetZeroFlag((bhb & 0xFF) == 0);
                         _registers.ClearNegativeFlag();
@@ -347,7 +349,7 @@ namespace GameBoyEmulator.Processor
                     if (DebugMode) Console.WriteLine("EI (Enable Interrupts) scheduled.");
                     break;
                 case 0xD9:
-                    _registers.PC = _ram.PopStack();
+                    _registers.PC = _mmu.PopStack();
                     _registers.IME = true;
                     cycles = 16;
                     if (DebugMode) Console.WriteLine($"RETI executed. _registers.PC set to 0x{_registers.PC:X4} and _registers.IME set to true.");
@@ -392,10 +394,10 @@ namespace GameBoyEmulator.Processor
                     }
                 case 0x99:
                     {
-                        int vvvavvvvv = _registers.A - _registers.C - (_registers.IsFlagSet(_registers.CarryFlag) ? 1 : 0);
+                        int vvvavvvvv = _registers.A - _registers.C - (_registers.IsFlagSet(Registers.CarryFlag) ? 1 : 0);
                         _registers.SetZeroFlag((vvvavvvvv & 0xFF) == 0);
                         _registers.SetNegativeFlag(true);
-                        _registers.SetHalfCarryFlag((_registers.A & 0xF) < (_registers.C & 0xF) + (_registers.IsFlagSet(_registers.CarryFlag) ? 1 : 0));
+                        _registers.SetHalfCarryFlag((_registers.A & 0xF) < (_registers.C & 0xF) + (_registers.IsFlagSet(Registers.CarryFlag) ? 1 : 0));
                         _registers.SetCarryFlag(vvvavvvvv < 0);
                         _registers.A = (byte)(vvvavvvvv & 0xFF);
                         cycles = 4;
@@ -416,7 +418,7 @@ namespace GameBoyEmulator.Processor
                     }
                 case 0xEF:
                     {
-                        _ram.PushStack(_registers.PC);
+                        _mmu.PushStack(_registers.PC);
                         _registers.PC = 0x28;
                         cycles = 16;
                         break;
@@ -428,7 +430,7 @@ namespace GameBoyEmulator.Processor
                     }
                 case 0x4D:
                     {
-                        _registers.PC = _ram.PopStack();
+                        _registers.PC = _mmu.PopStack();
                         _registers.IME = true;
                         cycles = 16;
                         break;
@@ -470,9 +472,9 @@ namespace GameBoyEmulator.Processor
                     {
                         ushort xxxx = _ram.ReadWord(_registers.PC);
                         _registers.PC += 2;
-                        if (_registers.IsFlagSet(_registers.ZeroFlag))
+                        if (_registers.IsFlagSet(Registers.ZeroFlag))
                         {
-                            _ram.PushStack(_registers.PC);
+                            _mmu.PushStack(_registers.PC);
                             _registers.PC = xxxx;
                             cycles = 24;
                         }
@@ -541,7 +543,7 @@ namespace GameBoyEmulator.Processor
                 case 0xDE:
                     {
                         byte d8 = _ram.ReadByte(_registers.PC++);
-                        int cz = _registers.IsFlagSet(_registers.CarryFlag) ? 1 : 0;
+                        int cz = _registers.IsFlagSet(Registers.CarryFlag) ? 1 : 0;
                         int zz = _registers.A - d8 - cz;
                         _registers.SetZeroFlag((zz & 0xFF) == 0);
                         _registers.SetNegativeFlag(true);
@@ -570,7 +572,7 @@ namespace GameBoyEmulator.Processor
                     {
                         ushort zxczxczxc = _ram.ReadWord(_registers.PC);
                         _registers.PC += 2;
-                        if (!_registers.IsFlagSet(_registers.ZeroFlag))
+                        if (!_registers.IsFlagSet(Registers.ZeroFlag))
                         {
                             _registers.PC = zxczxczxc;
                             cycles = 16;
@@ -628,7 +630,7 @@ namespace GameBoyEmulator.Processor
                     }
                 case 0x9A:
                     {
-                        int aaaaa = _registers.IsFlagSet(_registers.CarryFlag) ? 1 : 0;
+                        int aaaaa = _registers.IsFlagSet(Registers.CarryFlag) ? 1 : 0;
                         int zxczxc = _registers.A - _registers.D - aaaaa;
                         _registers.SetZeroFlag((zxczxc & 0xFF) == 0);
                         _registers.SetNegativeFlag(true);
@@ -679,7 +681,7 @@ namespace GameBoyEmulator.Processor
                     }
                 case 0xD7:
                     {
-                        _ram.PushStack(_registers.PC);
+                        _mmu.PushStack(_registers.PC);
                         _registers.PC = 0x10;
                         cycles = 16;
                         break;
@@ -729,7 +731,7 @@ namespace GameBoyEmulator.Processor
                     }
                 case 0xCF:
                     {
-                        _ram.PushStack(_registers.PC);
+                        _mmu.PushStack(_registers.PC);
                         _registers.PC = 0x08;
                         cycles = 16;
                         break;
@@ -791,9 +793,9 @@ namespace GameBoyEmulator.Processor
                     }
                 case 0xC0:
                     {
-                        if (!_registers.IsFlagSet(_registers.ZeroFlag))
+                        if (!_registers.IsFlagSet(Registers.ZeroFlag))
                         {
-                            _registers.PC = _ram.PopStack();
+                            _registers.PC = _mmu.PopStack();
                             cycles = 20;
                         }
                         else
@@ -834,7 +836,7 @@ namespace GameBoyEmulator.Processor
                     }
                 case 0xCE:
                     byte value = _ram.ReadByte(_registers.PC++);
-                    int carry = _registers.IsFlagSet(_registers.CarryFlag) ? 1 : 0;
+                    int carry = _registers.IsFlagSet(Registers.CarryFlag) ? 1 : 0;
                     int result = _registers.A + value + carry;
                     _registers.SetZeroFlag((result & 0xFF) == 0);
                     _registers.SetHalfCarryFlag(((_registers.A & 0xF) + (value & 0xF) + carry) > 0xF);
@@ -845,11 +847,11 @@ namespace GameBoyEmulator.Processor
                 case 0xC8:
                     if (DebugMode)
                     {
-                        Console.WriteLine($"Executing RET Z | _registers.ZeroFlag: {_registers.IsFlagSet(_registers.ZeroFlag)} | _registers.SP=0x{_registers.SP:X4}");
+                        Console.WriteLine($"Executing RET Z | Registers.ZeroFlag: {_registers.IsFlagSet(Registers.ZeroFlag)} | _registers.SP=0x{_registers.SP:X4}");
                     }
-                    if (_registers.IsFlagSet(_registers.ZeroFlag))
+                    if (_registers.IsFlagSet(Registers.ZeroFlag))
                     {
-                        ushort returnAddress = _ram.PopStack();
+                        ushort returnAddress = _mmu.PopStack();
                         if (DebugMode)
                         {
                             Console.WriteLine($"RET Z: Popped return address 0x{returnAddress:X4} from stack.");
@@ -861,15 +863,15 @@ namespace GameBoyEmulator.Processor
                     {
                         if (DebugMode)
                         {
-                            Console.WriteLine("RET Z: _registers.ZeroFlag not set, no return executed.");
+                            Console.WriteLine("RET Z: Registers.ZeroFlag not set, no return executed.");
                         }
                         cycles = 8;
                     }
                     break;
                 case 0xD8:
-                    if (_registers.IsFlagSet(_registers.CarryFlag))
+                    if (_registers.IsFlagSet(Registers.CarryFlag))
                     {
-                        _registers.PC = _ram.PopStack();
+                        _registers.PC = _mmu.PopStack();
                         cycles = 20;
                     }
                     else
@@ -914,10 +916,10 @@ namespace GameBoyEmulator.Processor
                     cycles = 4;
                     break;
                 case 0xC4:
-                    if (!_registers.IsFlagSet(_registers.ZeroFlag))
+                    if (!_registers.IsFlagSet(Registers.ZeroFlag))
                     {
                         address = (ushort)(_ram.ReadByte(_registers.PC++) | (_ram.ReadByte(_registers.PC++) << 8));
-                        _ram.PushStack(_registers.PC);
+                        _mmu.PushStack(_registers.PC);
                         _registers.PC = address;
                         cycles = 24;
                     }
@@ -928,7 +930,7 @@ namespace GameBoyEmulator.Processor
                     }
                     break;
                 case 0x8D:
-                    carry = _registers.IsFlagSet(_registers.CarryFlag) ? 1 : 0;
+                    carry = _registers.IsFlagSet(Registers.CarryFlag) ? 1 : 0;
                     result = _registers.A + _registers.L + carry;
                     _registers.SetZeroFlag((result & 0xFF) == 0);
                     _registers.SetHalfCarryFlag(((_registers.A & 0xF) + (_registers.L & 0xF) + carry) > 0xF);
@@ -1073,8 +1075,8 @@ namespace GameBoyEmulator.Processor
                 case 0x20:
                     sbyte vzv = (sbyte)_ram.ReadByte(_registers.PC++);
                     if (DebugMode)
-                        Console.WriteLine($"JR NZ: _registers.PC=0x{_registers.PC:X4}, Offset={vzv}, _registers.ZeroFlag={_registers.IsFlagSet(_registers.ZeroFlag)}");
-                    if (!_registers.IsFlagSet(_registers.ZeroFlag))
+                        Console.WriteLine($"JR NZ: _registers.PC=0x{_registers.PC:X4}, Offset={vzv}, Registers.ZeroFlag={_registers.IsFlagSet(Registers.ZeroFlag)}");
+                    if (!_registers.IsFlagSet(Registers.ZeroFlag))
                     {
                         _registers.PC = (ushort)(_registers.PC + vzv);
                         if (DebugMode)
@@ -1084,7 +1086,7 @@ namespace GameBoyEmulator.Processor
                     else
                     {
                         if (DebugMode)
-                            Console.WriteLine("JR NZ: No jump, _registers.ZeroFlag is set.");
+                            Console.WriteLine("JR NZ: No jump, Registers.ZeroFlag is set.");
                         cycles = 8;
                     }
                     break;
@@ -1120,7 +1122,7 @@ namespace GameBoyEmulator.Processor
                     break;
                 case 0x28:
                     offset = (sbyte)_ram.ReadByte(_registers.PC++);
-                    if (_registers.IsFlagSet(_registers.ZeroFlag))
+                    if (_registers.IsFlagSet(Registers.ZeroFlag))
                     {
                         _registers.PC = (ushort)(_registers.PC + offset);
                         cycles = 12;
@@ -1168,7 +1170,7 @@ namespace GameBoyEmulator.Processor
                     break;
                 case 0x30:
                     offset = (sbyte)_ram.ReadByte(_registers.PC++);
-                    if (!_registers.IsFlagSet(_registers.CarryFlag))
+                    if (!_registers.IsFlagSet(Registers.CarryFlag))
                     {
                         _registers.PC = (ushort)(_registers.PC + offset);
                         cycles = 12;
@@ -1217,7 +1219,7 @@ namespace GameBoyEmulator.Processor
                     break;
                 case 0x38:
                     offset = (sbyte)_ram.ReadByte(_registers.PC++);
-                    if (_registers.IsFlagSet(_registers.CarryFlag))
+                    if (_registers.IsFlagSet(Registers.CarryFlag))
                     {
                         _registers.PC = (ushort)(_registers.PC + offset);
                         cycles = 12;
@@ -1258,7 +1260,7 @@ namespace GameBoyEmulator.Processor
                     cycles = 8;
                     break;
                 case 0x3F:
-                    _registers.SetCarryFlag(!_registers.IsFlagSet(_registers.CarryFlag));
+                    _registers.SetCarryFlag(!_registers.IsFlagSet(Registers.CarryFlag));
                     _registers.SetFlag(6, false);
                     _registers.SetFlag(5, false);
                     cycles = 4;
@@ -1272,9 +1274,9 @@ namespace GameBoyEmulator.Processor
                     cycles = 4;
                     break;
                 case 0xD0:  // RET NC
-                    if (!_registers.IsFlagSet(_registers.CarryFlag))
+                    if (!_registers.IsFlagSet(Registers.CarryFlag))
                     {
-                        _registers.PC = _ram.PopStack();  // Return to the address on top of the stack
+                        _registers.PC = _mmu.PopStack();  // Return to the address on top of the stack
                         cycles = 20;
                     }
                     else
@@ -1338,25 +1340,25 @@ namespace GameBoyEmulator.Processor
                     cycles = 8;
                     break;
                 case 0xFF:
-                    _ram.PushStack(_registers.PC);
+                    _mmu.PushStack(_registers.PC);
                     _registers.PC = 0x0038;
                     cycles = 16;
                     break;
                 case 0xCD:
                     ushort ca = _ram.ReadWord(_registers.PC);
                     _registers.PC += 2;
-                    _ram.PushStack(_registers.PC);
+                    _mmu.PushStack(_registers.PC);
                     _registers.PC = ca;
                     cycles = 24;
                     break;
                 case 0xC9:
-                    _registers.PC = _ram.PopStack();
+                    _registers.PC = _mmu.PopStack();
                     cycles = 16;
                     break;
                 case 0xCA:
                     addr = _ram.ReadWord(_registers.PC);
                     _registers.PC += 2;
-                    if (_registers.IsFlagSet(_registers.ZeroFlag))
+                    if (_registers.IsFlagSet(Registers.ZeroFlag))
                     {
                         _registers.PC = addr;
                         cycles = 16;
@@ -1565,7 +1567,7 @@ namespace GameBoyEmulator.Processor
                     break;
                 case 0x02:
                     value = GetRegisterValue(regIndex);
-                    byte carryIn = _registers.IsFlagSet(_registers.CarryFlag) ? (byte)1 : (byte)0;
+                    byte carryIn = _registers.IsFlagSet(Registers.CarryFlag) ? (byte)1 : (byte)0;
                     result = (byte)((value << 1) | carryIn);
                     _registers.SetZeroFlag(result == 0);
                     _registers.ClearNegativeFlag();
@@ -1577,7 +1579,7 @@ namespace GameBoyEmulator.Processor
                 case 0x03:
                     value = GetRegisterValue(regIndex);
                     byte carryOut = (byte)(value & 0x01);
-                    byte carryInRR = _registers.IsFlagSet(_registers.CarryFlag) ? (byte)0x80 : (byte)0;
+                    byte carryInRR = _registers.IsFlagSet(Registers.CarryFlag) ? (byte)0x80 : (byte)0;
                     result = (byte)((value >> 1) | carryInRR);
                     _registers.SetZeroFlag(result == 0);
                     _registers.ClearNegativeFlag();

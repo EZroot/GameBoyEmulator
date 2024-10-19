@@ -2,12 +2,12 @@
 
 namespace GameBoyEmulator.Processor
 {
-    internal class Registers
+    public class Registers
     {
-        public byte ZeroFlag = 0x80;
-        public byte NegativeFlag = 0x40;
-        public byte HalfCarryFlag = 0x20;
-        public byte CarryFlag = 0x10;
+        public const byte ZeroFlag = 0x80;
+        public const byte NegativeFlag = 0x40;
+        public const byte HalfCarryFlag = 0x20;
+        public const byte CarryFlag = 0x10;
 
         public byte A, F, B, C, D, E, H, L;
         public ushort PC, SP;
