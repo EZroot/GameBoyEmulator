@@ -1292,6 +1292,18 @@ namespace GameBoyEmulator
                     ClearCarryFlag();
                     cycles = 4;
                     break;
+                case 0xD0:  // RET NC
+                    if (!IsFlagSet(CarryFlag))
+                    {
+                        PC = PopStack();  // Return to the address on top of the stack
+                        cycles = 20;
+                    }
+                    else
+                    {
+                        cycles = 8;
+                    }
+                    break;
+
                 case 0x41:
                     B = C;
                     cycles = 4;
