@@ -1,12 +1,14 @@
+using GameBoyEmulator.Memory;
+
 namespace GameBoyEmulator
 {
-    public class Timer
+    internal class Timer
     {
         private int _divCounter;
         private int _timaCounter;
         private const int ClockSpeed = 4194304; 
-        private Memory _memory;
-        public Timer(Memory memory)
+        private RAM _memory;
+        public Timer(RAM memory)
         {
             _memory = memory;
         }

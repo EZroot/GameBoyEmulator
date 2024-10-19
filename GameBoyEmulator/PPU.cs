@@ -1,6 +1,8 @@
+using GameBoyEmulator.Memory;
+
 namespace GameBoyEmulator
 {
-    public class PPU
+    internal class PPU
     {
         public const int CyclesPerScanline = 456;
         public const int TotalScanlines = 154;
@@ -8,11 +10,11 @@ namespace GameBoyEmulator
         public int CurrentScanline { get; private set; } = 0;
         private int _cycles = 0;
         private bool DebugMode = false;
-        private readonly Memory _memory;
+        private readonly RAM _memory;
         public const int ScreenWidth = 160;
         public const int ScreenHeight = 144;
         private byte[,] _frameBuffer = new byte[ScreenHeight, ScreenWidth];
-        public PPU(Memory memory)
+        public PPU(RAM memory)
         {
             _memory = memory;
         }

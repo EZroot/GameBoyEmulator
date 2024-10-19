@@ -1,12 +1,16 @@
+using GameBoyEmulator.Processor;
+using GameBoyEmulator.Memory;
 using System.Drawing;
 using System.Text;
 
 namespace GameBoyEmulator
 {
-    public class Emulator
+    internal class Emulator
     {
         private CPU _cpu;
-        private Memory _memory;
+        private Registers _registry;
+        private Opcode _opcode;
+        private RAM _memory;
         private PPU _ppu;
         private Timer _timer;
         private const int CyclesPerFrame = 70224;
@@ -17,8 +21,10 @@ namespace GameBoyEmulator
         private const int ScreenHeight = 144;
         public Emulator()
         {
-            _memory = new Memory();
-            _cpu = new CPU(_memory);
+            _registry = new Registers();
+            _memory = new RAM(_registry);
+            _opcode = new Opcode(_registry,_memory);
+            _cpu = new CPU(_registry, _opcode, _memory);
             _ppu = new PPU(_memory);
             _timer = new Timer(_memory);
             InitializeHardwareRegisters();
@@ -230,157 +236,7 @@ namespace GameBoyEmulator
                     return romData.Length;
             }
         }
-        public void Test_JR_NZ()
-        {
-            Console.WriteLine("\n--- JR NZ Test ---");
-            _cpu.PC = 0x100;
-            _cpu.SetZeroFlag(false);
-            _memory.WriteByte(0x100, 0x20);
-            _memory.WriteByte(0x101, 0x05);
-            Console.WriteLine($"Memory[0x101] = {_memory.ReadByte(0x101)}");
-            _cpu.Step();
-            Console.WriteLine($"PC after JR NZ (Zero Flag not set): 0x{_cpu.PC:X4}");
-            if (_cpu.PC == 0x107)
-            {
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("Test Passed: JR NZ jumped when ZeroFlag is not set.");
-            }
-            else
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Test Failed: Expected PC=0x107, got PC=0x{_cpu.PC:X4}");
-            }
-            Console.ResetColor();
-            _cpu.PC = 0x200;
-            _cpu.SetZeroFlag(true);
-            _memory.WriteByte(0x200, 0x20);
-            _memory.WriteByte(0x201, 0x05);
-            _cpu.Step();
-            Console.WriteLine($"PC after JR NZ (Zero Flag set): 0x{_cpu.PC:X4}");
-            if (_cpu.PC == 0x202)
-            {
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("Test Passed: JR NZ did not jump when ZeroFlag is set.");
-            }
-            else
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Test Failed: Expected PC=0x202, got PC=0x{_cpu.PC:X4}");
-            }
-            Console.ResetColor();
-        }
-        public void Test_JP_Z()
-        {
-            Console.WriteLine("\n--- JP Z Test ---");
-            _cpu.PC = 0x100;
-            _cpu.SetZeroFlag(true);
-            _memory.WriteByte(0x100, 0xCA);
-            _memory.WriteWord(0x101, 0x200);
-            _cpu.Step();
-            if (_cpu.PC == 0x200)
-            {
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("Test Passed: JP Z jumped when ZeroFlag is set.");
-            }
-            else
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Test Failed: Expected PC=0x200, got PC=0x{_cpu.PC:X4}");
-            }
-            Console.ResetColor();
-            _cpu.PC = 0x300;
-            _cpu.SetZeroFlag(false);
-            _memory.WriteByte(0x300, 0xCA);
-            _memory.WriteWord(0x301, 0x400);
-            _cpu.Step();
-            if (_cpu.PC == 0x303)
-            {
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("Test Passed: JP Z did not jump when ZeroFlag is cleared.");
-            }
-            else
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Test Failed: Expected PC=0x303, got PC=0x{_cpu.PC:X4}");
-            }
-            Console.ResetColor();
-        }
-        public void Test_CP_d8()
-        {
-            Console.WriteLine("\n--- CP d8 Test ---");
-            _cpu.A = 0x50;
-            _memory.WriteByte(0x100, 0xFE);
-            _memory.WriteByte(0x101, 0x50);
-            _cpu.PC = 0x100;
-            _cpu.Step();
-            if (_cpu.GetZeroFlag() && _cpu.GetNegativeFlag() && !_cpu.GetCarryFlag() && !_cpu.GetHalfCarryFlag())
-            {
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("Test Passed: CP d8 with A == d8, flags are set correctly.");
-            }
-            else
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("Test Failed: Expected Zero Flag set and Carry Flag cleared.");
-            }
-            Console.ResetColor();
-            _cpu.A = 0x30;
-            _memory.WriteByte(0x200, 0xFE);
-            _memory.WriteByte(0x201, 0x50);
-            _cpu.PC = 0x200;
-            _cpu.Step();
-            if (!_cpu.GetZeroFlag() && _cpu.GetCarryFlag() && _cpu.GetNegativeFlag() && !_cpu.GetHalfCarryFlag())
-            {
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("Test Passed: CP d8 with A < d8, Carry Flag set.");
-            }
-            else
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("Test Failed: Expected Carry Flag set and Zero Flag cleared.");
-            }
-            Console.ResetColor();
-        }
-        public void Test_RET_and_RET_Z()
-        {
-            Console.WriteLine("\n--- RET and RET Z Test ---");
-            Console.WriteLine("\nWARNING - THIS TEST NEEDS INTERUPTS DISABLED IN CPU STEP!");
-            _cpu.SP = 0xFFFE;
-            _memory.WriteWord(0xFFFE, 0x300);
-            _cpu.PC = 0x100;
-            _memory.WriteByte(0x100, 0xC9);
-            _cpu.Step();
-            if (_cpu.PC == 0x300)
-            {
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("Test Passed: RET returned to correct address.");
-            }
-            else
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Test Failed: Expected PC=0x300, got PC=0x{_cpu.PC:X4}");
-            }
-            Console.ResetColor();
-            _cpu.SP = 0xFFFE;
-            _memory.WriteWord(0xFFFE, 0x400);
-            _cpu.PC = 0x200;
-            Console.WriteLine("Setting Zero Flag to true before RET Z.");
-            _cpu.SetZeroFlag(true);
-            Console.WriteLine($"F register after setting ZeroFlag: 0x{_cpu.F:X2}");
-            _memory.WriteByte(0x200, 0xC8);
-            _cpu.Step();
-            if (_cpu.PC == 0x400)
-            {
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("Test Passed: RET Z returned when ZeroFlag is set.");
-            }
-            else
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Test Failed: Expected PC=0x400, got PC=0x{_cpu.PC:X4}");
-            }
-            Console.ResetColor();
-        }
+
         private bool VerifyNintendoLogo(byte[] romData)
         {
             const int logoStartAddress = 0x0104;

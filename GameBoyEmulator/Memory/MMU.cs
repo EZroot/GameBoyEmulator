@@ -8,5 +8,6 @@ namespace GameBoyEmulator.Memory
 {
     internal class MMU
     {
+
     }
 }
