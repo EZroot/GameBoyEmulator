@@ -1,8 +1,5 @@
 
 # 🎮 GameBoyEmulator
-
-![GameBoyEmulator Preview](https://raw.githubusercontent.com/EZroot/GameBoyEmulator/refs/heads/main/GameBoyEmulator/screenshots/gameboyemulator.gif)
-
 ## 📜 Description
 
 **GameBoyEmulator** is a pure C# implementation of the original Game Boy hardware. It allows you to run Game Boy games in a Windows command-line environment, with support for key components like the CPU, memory, and graphics processing (PPU). ~~<small>This emulator focuses on accuracy and performance while maintaining a clean and readable codebase</small>~~, making it a great resource for anyone interested in emulation or CPU architecture.
