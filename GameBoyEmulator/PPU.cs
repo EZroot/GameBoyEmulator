@@ -9,8 +9,8 @@ namespace GameBoyEmulator
         private int _cycles = 0;
         private bool DebugMode = false;
         private readonly Memory _memory;
-        private const int ScreenWidth = 160;
-        private const int ScreenHeight = 144;
+        public const int ScreenWidth = 160;
+        public const int ScreenHeight = 144;
         private byte[,] _frameBuffer = new byte[ScreenHeight, ScreenWidth];
         public PPU(Memory memory)
         {
@@ -85,7 +85,7 @@ namespace GameBoyEmulator
                 AdvanceScanline();
             }
         }
-        private void AdvanceScanline()
+        public void AdvanceScanline()
         {
             RenderScanline(CurrentScanline);
             RenderSprites(CurrentScanline);
@@ -162,7 +162,7 @@ namespace GameBoyEmulator
             }
             return tilePixels;
         }
-        private void RenderBackground()
+        public void RenderBackground()
         {
             ushort bgTileMapAddress = 0x9800;
             byte scx = _memory.ReadByte(0xFF43);

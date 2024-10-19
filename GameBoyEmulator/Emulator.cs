@@ -12,6 +12,7 @@ namespace GameBoyEmulator
         private const int CyclesPerFrame = 70224;
         private bool DebugFrameStepThroughPerFrame = false;
         private bool DebugFrameStepThroughPerCycle = false;
+        private bool GoFast = false; //Skips frames when renderering to speed up cpu cycles
         private const int ScreenWidth = 160;
         private const int ScreenHeight = 144;
         public Emulator()
@@ -26,6 +27,7 @@ namespace GameBoyEmulator
         {
             Console.WriteLine("Emulator started. Loading ROM...");
             Console.WriteLine("Starting execution...");
+            if (GoFast) Console.WriteLine("Fast mode activated!");
             Dictionary<ConsoleKey, (int buttonIndex, bool isPressed, int frameCounter)> keyMappings = new Dictionary<ConsoleKey, (int, bool, int)>
     {
         { ConsoleKey.Z, (0, false, 0) },
@@ -38,11 +40,27 @@ namespace GameBoyEmulator
         { ConsoleKey.Spacebar, (7, false, 0) }
     };
             Task.Run(() => DetectKeyPressesAsync(keyMappings));
+
+            var skipFrame = 60;
             while (true)
             {
                 ExecuteFrame();
                 if (DebugFrameStepThroughPerFrame) Console.ReadKey();
-                if (!DebugFrameStepThroughPerFrame) RenderScreen();
+                if (GoFast)
+                {
+                    skipFrame--;
+                    if (skipFrame <= 0)
+                    {
+                        if (!DebugFrameStepThroughPerFrame) RenderScreen();
+                        skipFrame = 1000;
+                    }
+                }
+                else
+                {
+                    if (!DebugFrameStepThroughPerFrame) RenderScreen();
+                }
+                if (GoFast) continue;
+
                 foreach (var key in keyMappings.Keys.ToList())
                 {
                     if (keyMappings[key].isPressed)

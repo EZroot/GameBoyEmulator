@@ -1,4 +1,3 @@
-using System;
 namespace GameBoyEmulator
 {
     public class Memory
@@ -119,7 +118,8 @@ namespace GameBoyEmulator
         {
             if (romData.Length > 0x8000)
             {
-                throw new InvalidOperationException("ROM too large. Basic ROM loading only supports up to 32KB ROMs.");
+                Console.WriteLine("WARNING! ROM too large. Basic ROM loading only supports up to 32KB ROMs.\n Continuing anyway...");
+                Thread.Sleep(2500);
             }
             Array.Copy(romData, 0, _memory, 0x0000, romData.Length);
             if (debugMode)

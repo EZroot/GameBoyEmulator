@@ -87,6 +87,7 @@ namespace GameBoyEmulator
             }
             return cycles;
         }
+
         private int ExecuteInstruction(byte opcode)
         {
             int cycles = 0;
@@ -423,6 +424,56 @@ namespace GameBoyEmulator
                     cycles = 16;
                     if (DebugMode) Console.WriteLine($"RETI executed. PC set to 0x{PC:X4} and IME set to true.");
                     break;
+                case 0xF8:
+                    {
+                        sbyte zxczxzz = (sbyte)memory.ReadByte(PC++);
+                        ushort cczcczzzx = (ushort)(SP + zxczxzz);
+
+                        // Set flags
+                        SetZeroFlag(false); // The Z flag is always cleared
+                        ClearNegativeFlag(); // The N flag is always cleared
+                        SetHalfCarryFlag(((SP & 0xF) + (zxczxzz & 0xF)) > 0xF); // Check for half carry
+                        SetCarryFlag(((SP & 0xFF) + (zxczxzz & 0xFF)) > 0xFF); // Check for full carry
+
+                        // Store the result in HL
+                        H = (byte)((cczcczzzx >> 8) & 0xFF);
+                        L = (byte)(cczcczzzx & 0xFF);
+
+                        cycles = 12;
+                        break;
+                    }
+
+                case 0x10:
+                    {
+                        // STOP instruction, halts CPU until a button press occurs
+                        PC++;
+                        Halted = true;
+                        cycles = 4;
+                        break;
+                    }
+                case 0xE8:
+                    {
+                        int signedValue = (sbyte)memory.ReadByte(PC++);
+                        SetZeroFlag(false);
+                        ClearNegativeFlag();
+                        SetHalfCarryFlag((SP & 0xF) + (signedValue & 0xF) > 0xF);
+                        SetCarryFlag((SP & 0xFF) + (signedValue & 0xFF) > 0xFF);
+                        SP = (ushort)(SP + signedValue);
+                        cycles = 16;
+                        break;
+                    }
+                case 0x99:
+                    {
+                        int vvvavvvvv = A - C - (IsFlagSet(CarryFlag) ? 1 : 0);
+                        SetZeroFlag((vvvavvvvv & 0xFF) == 0);
+                        SetNegativeFlag(true);
+                        SetHalfCarryFlag((A & 0xF) < (C & 0xF) + (IsFlagSet(CarryFlag) ? 1 : 0));
+                        SetCarryFlag(vvvavvvvv < 0);
+                        A = (byte)(vvvavvvvv & 0xFF);
+                        cycles = 4;
+                        break;
+                    }
+
                 case 0xC3:
                     {
                         ushort xxx = memory.ReadWord(PC);
@@ -1528,6 +1579,7 @@ namespace GameBoyEmulator
             }
             return cycles;
         }
+        
         private int ExecuteCBInstruction(byte opcode)
         {
             int cycles = 0;
@@ -1840,15 +1892,16 @@ namespace GameBoyEmulator
             D = (byte)(val >> 8);
             E = (byte)(val & 0xFF);
         }
-        private ushort GetHL()
+        public ushort GetHL()
         {
             return (ushort)((H << 8) | L);
         }
-        private void SetHL(ushort val)
+        public void SetHL(ushort val)
         {
             H = (byte)(val >> 8);
             L = (byte)(val & 0xFF);
         }
+
         const byte ZeroFlag = 0x80;
         const byte NegativeFlag = 0x40;
         const byte HalfCarryFlag = 0x20;
@@ -1871,11 +1924,11 @@ namespace GameBoyEmulator
         {
             F &= (byte)(~HalfCarryFlag & 0xFF);
         }
-        private void ClearCarryFlag()
+        public void ClearCarryFlag()
         {
             F &= (byte)(~CarryFlag & 0xFF);
         }
-        private void SetCarryFlag(bool condition)
+        public void SetCarryFlag(bool condition)
         {
             if (condition)
                 F |= CarryFlag;

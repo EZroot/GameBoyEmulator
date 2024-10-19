@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace GameBoyEmulator
+﻿namespace GameBoyEmulator
 {
     class Program
     {

@@ -1,10 +1,31 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net8.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+
+		<!-- Enable Native AOT -->
+		<PublishAot>true</PublishAot>
+		<SelfContained>true</SelfContained>
+		<!-- Makes the app a standalone executable -->
+		<InvariantGlobalization>true</InvariantGlobalization>
+		<!-- Optional: reduces executable size -->
+		<StripSymbols>true</StripSymbols>
+		<!-- Optional: reduces executable size -->
+
+		<!-- Add Runtime Identifier (RID) -->
+		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+		<!-- You can change this depending on your target platform -->
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="xunit" Version="2.9.2" />
+		<PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+	</ItemGroup>
 
 </Project>
