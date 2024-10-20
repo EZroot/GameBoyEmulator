@@ -1,4 +1,6 @@
+using GameBoyEmulator.Debug;
 using GameBoyEmulator.Processor;
+using System;
 namespace GameBoyEmulator.Memory
 {
     public class MMU
@@ -6,7 +8,6 @@ namespace GameBoyEmulator.Memory
         private readonly RAM _ram;
         private readonly Registers _registers;
         private readonly bool[] _joypadButtons = new bool[8];
-        private bool debugMode;
         public MMU(Registers registers, RAM ram)
         {
             _ram = ram;
@@ -14,7 +15,7 @@ namespace GameBoyEmulator.Memory
         }
         public byte ReadByte(ushort address)
         {
-            if (debugMode)
+            if (Debugger.IsDebugEnabled && Debugger.dWriteOutMemoryReadWrite)
             {
                 Console.WriteLine($"[DEBUG] ReadByte called at address 0x{address:X4}");
             }
@@ -23,7 +24,7 @@ namespace GameBoyEmulator.Memory
                 return GetJoypadState();
             }
             byte value = _ram.ReadByte(address);
-            if (debugMode)
+            if (Debugger.IsDebugEnabled && Debugger.dWriteOutMemoryReadWrite)
             {
                 Console.WriteLine($"[DEBUG] Read from memory address 0x{address:X4}: 0x{value:X2}");
             }
@@ -31,13 +32,13 @@ namespace GameBoyEmulator.Memory
         }
         public void WriteByte(ushort address, byte value)
         {
-            if (debugMode)
+            if (Debugger.IsDebugEnabled && Debugger.dWriteOutMemoryReadWrite)
             {
                 Console.WriteLine($"[DEBUG] WriteByte called at address 0x{address:X4} with value 0x{value:X2}");
             }
             if (address == 0xFF44) 
             {
-                if (debugMode)
+                if (Debugger.IsDebugEnabled && Debugger.dWriteOutMemoryReadWrite)
                 {
                     Console.WriteLine("[DEBUG] Attempted write to LY (0xFF44). Ignored.");
                 }
@@ -52,7 +53,7 @@ namespace GameBoyEmulator.Memory
         public void WriteLY(byte value)
         {
             _ram.WriteByte(0xFF44, value); 
-            if (debugMode)
+            if (Debugger.IsDebugEnabled && Debugger.dWriteOutMemoryReadWrite)
             {
                 Console.WriteLine($"[DEBUG] PPU wrote LY=0x{value:X2}");
             }
@@ -77,7 +78,7 @@ namespace GameBoyEmulator.Memory
             {
                 _ram.WriteByte((ushort)(0xFE00 + i), ReadByte((ushort)(sourceAddress + i)));
             }
-            if (debugMode)
+            if (Debugger.IsDebugEnabled && Debugger.dWriteOutMemoryReadWrite)
             {
                 Console.WriteLine($"[DEBUG] DMA Transfer initiated from 0x{sourceAddress:X4}.");
             }
@@ -108,9 +109,10 @@ namespace GameBoyEmulator.Memory
         {
             ValidateButtonIndex(buttonIndex);
             _joypadButtons[buttonIndex] = pressed;
-            if (debugMode)
+            if (Debugger.IsDebugEnabled && Debugger.dWriteOutJoypadReadWrite)
             {
-                Console.WriteLine($"[DEBUG] Joypad button {(pressed ? "pressed" : "released")}: {buttonIndex}");
+                if(pressed)
+                    Logger.Log($"[DEBUG] Joypad button <color=yellow>{(pressed ? "pressed" : "released")}:</color> <color=white>{buttonIndex}</color>");
             }
         }
         private void ValidateButtonIndex(int button)

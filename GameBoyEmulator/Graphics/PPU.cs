@@ -1,5 +1,7 @@
-using GameBoyEmulator.Interrupts;
 using GameBoyEmulator.Memory;
+using GameBoyEmulator.Debug;
+using GameBoyEmulator.Interrupts;
+using System;
 namespace GameBoyEmulator.Graphics
 {
     public class PPU
@@ -23,11 +25,12 @@ namespace GameBoyEmulator.Graphics
         {
             _cycles += cpuCycles;
             byte lcdc = _mmu.ReadByte(0xFF40);
-            bool lcdEnabled = (lcdc & 0x80) != 0; 
+            bool lcdEnabled = (lcdc & 0x80) != 0;
             if (!lcdEnabled)
             {
                 _cycles = 0;
                 CurrentScanline = 0;
+                _mmu.WriteLY(0);
                 SetLCDMode(0);
                 _lcdEnabledLastUpdate = false;
                 return;
@@ -39,7 +42,11 @@ namespace GameBoyEmulator.Graphics
                 SetLCDMode(2);
             }
             _lcdEnabledLastUpdate = lcdEnabled;
-            while (_cycles > 0) 
+            if (Debugger.IsDebugEnabled && Debugger.dDebugPPU)
+            {
+                Logger.Log($"PPU Update: Cycles={_cycles}, Scanline={CurrentScanline}, Mode={_mmu.ReadByte(0xFF41) & 0x03}");
+            }
+            while (_cycles > 0)
             {
                 int mode = _mmu.ReadByte(0xFF41) & 0x03;
                 if (CurrentScanline < VBlankScanline)
@@ -62,6 +69,10 @@ namespace GameBoyEmulator.Graphics
                         {
                             _cycles -= 172;
                             _renderer.RenderScanline(CurrentScanline);
+                            if (Debugger.IsDebugEnabled && Debugger.dDebugPPU)
+                            {
+                                Logger.Log($"Rendering Scanline {CurrentScanline}");
+                            }
                             SetLCDMode(0);
                         }
                         else
@@ -133,13 +144,13 @@ namespace GameBoyEmulator.Graphics
             switch (mode)
             {
                 case 0:
-                    if ((stat & 0x08) != 0) requestInterrupt = true; 
+                    if ((stat & 0x08) != 0) requestInterrupt = true;
                     break;
                 case 1:
-                    if ((stat & 0x10) != 0) requestInterrupt = true; 
+                    if ((stat & 0x10) != 0) requestInterrupt = true;
                     break;
                 case 2:
-                    if ((stat & 0x20) != 0) requestInterrupt = true; 
+                    if ((stat & 0x20) != 0) requestInterrupt = true;
                     break;
             }
             if (requestInterrupt)
@@ -151,35 +162,16 @@ namespace GameBoyEmulator.Graphics
         }
         public void CheckLYCMatch()
         {
-            byte ly = _mmu.ReadByte(0xFF44);
-            byte lyc = _mmu.ReadByte(0xFF45);
-            byte stat = _mmu.ReadByte(0xFF41);
-            if (ly == lyc)
-            {
-                stat |= 0x04; 
-                _mmu.WriteByte(0xFF41, stat);
-                if ((stat & 0x40) != 0) 
-                {
-                    byte interruptFlags = _mmu.ReadByte(0xFF0F);
-                    interruptFlags |= InterruptFlags.LCDSTAT;
-                    _mmu.WriteByte(0xFF0F, interruptFlags);
-                }
-            }
-            else
-            {
-                stat &= 0xFB; 
-                _mmu.WriteByte(0xFF41, stat);
-            }
-        }
-        public void OverrideCurrentScanline(int scanLine)
-        {
-            CurrentScanline = scanLine;
         }
         private void TriggerVBlank()
         {
             byte interruptFlags = _mmu.ReadByte(0xFF0F);
             interruptFlags |= InterruptFlags.VBlank;
             _mmu.WriteByte(0xFF0F, interruptFlags);
+            if (Debugger.IsDebugEnabled && (Debugger.dStepThroughFrame || Debugger.dDebugPPU))
+            {
+                Logger.Log("<color=green>Triggered V Blank!</color>");
+            }
         }
     }
 }

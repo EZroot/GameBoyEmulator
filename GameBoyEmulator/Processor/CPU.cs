@@ -24,7 +24,7 @@ namespace GameBoyEmulator.Processor
             if (interruptCycles > 0)
             {
                 cycles += interruptCycles;
-                return cycles; 
+                return cycles;
             }
             if (_registers.Halted)
             {
@@ -38,9 +38,9 @@ namespace GameBoyEmulator.Processor
             {
                 _registers.IME = true;
                 _registers.EI_Scheduled = false;
-                if (_registers.DebugMode)
+                if (Debugger.IsDebugEnabled && Debugger.dWriteOutMemoryReadWrite)
                 {
-                    Console.WriteLine("Interrupt Master Enable (IME) set to true.");
+                    Logger.Log("Interrupt Master Enable (IME) set to true.");
                 }
             }
             return cycles;

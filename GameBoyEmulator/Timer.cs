@@ -1,7 +1,8 @@
 using GameBoyEmulator.Memory;
+using System;
 namespace GameBoyEmulator
 {
-    internal class Timer
+    public class Timer
     {
         private int _divCounter;
         private int _timaCounter;

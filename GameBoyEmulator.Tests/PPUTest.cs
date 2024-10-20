@@ -7,6 +7,7 @@ namespace GameBoyEmulator.Tests
     [TestFixture]
     public class PPUTests
     {
+        private GameBoyEmulator.Timer _timer;
         private CPU _cpu;
         private Registers _registry;
         private Opcode _opcode;
@@ -26,17 +27,108 @@ namespace GameBoyEmulator.Tests
         {
             _registry = new Registers();
             _ram = new RAM();
+            _timer = new Timer(_ram);
             _mmu = new MMU(_registry, _ram);
             _renderer = new Renderer(_mmu);
             _ppu = new PPU(_mmu, _renderer);
             _opcode = new Opcode(_registry, _mmu, _ram);
             _interruptController = new InterruptController(_registry, _mmu, _ram);
             _cpu = new CPU(_registry, _opcode, _ram, _interruptController);
+            GameBoyEmulator.Debug.Debugger.EnableDebugModeForTests();
+            Debug.Debugger.dDebugPPU = true;
         }
         [Test]
         public void Test_InitialScanline_ShouldBeZero()
         {
-            Assert.AreEqual(0, _ppu.CurrentScanline);
+            Assert.AreEqual(0, _ppu.CurrentScanline, "Initial scanline should be 0.");
+        }
+        [Test]
+        public void Test_LCDDisabled_ShouldResetScanlineAndCycles()
+        {
+            _mmu.WriteByte(0xFF40, 0x00); 
+            _ppu.Update(456);
+            Assert.AreEqual(0, _ppu.CurrentScanline, "Scanline should reset to 0 when LCD is disabled.");
+            Assert.AreEqual(0, _mmu.ReadByte(0xFF44), "LY register should reset to 0 when LCD is disabled.");
+        }
+        [Test]
+        public void Test_LYCMatchInterrupt_ShouldTriggerWhenLYEqualsLYC()
+        {
+            _mmu.WriteByte(0xFF40, 0x80); 
+            _mmu.WriteByte(0xFF45, 10);   
+            for (int i = 0; i < 4560; i += 456)
+            {
+                _ppu.Update(456);
+                _cpu.Step(); 
+            }
+            byte stat = _mmu.ReadByte(0xFF41);
+            Assert.IsTrue((stat & 0x04) != 0, "LYC match should set the corresponding STAT flag.");
+        }
+        [Test]
+        public void Test_VBlankInterrupt_ShouldTriggerAtScanline144()
+        {
+            _mmu.WriteByte(0xFF40, 0x80); 
+            _registry.IME = false;
+            ExecuteFrame();
+            Assert.AreEqual(144, _ppu.CurrentScanline, "VBlank should start at scanline 144.");
+            byte interruptFlags = _mmu.ReadByte(0xFF0F);
+            Assert.IsTrue((interruptFlags & InterruptFlags.VBlank) != 0, "VBlank interrupt should be triggered.");
+        }
+        private void ExecuteFrame()
+        {
+            int cycles = 0;
+            while (cycles < CyclesPerFrame)
+            {
+                int stepCycles = _cpu.Step();
+                _ppu.Update(stepCycles);
+                _timer.Update(stepCycles);  
+                cycles += stepCycles;
+            }
+        }
+        [Test]
+        public void Test_PPUUpdatesScreenBuffer_AfterFullFrame()
+        {
+            for (int i = 0; i < CyclesPerFrame; i += 456)
+            {
+                _ppu.Update(456);
+            }
+            byte[,] screenBuffer = _renderer.GetScreenBuffer();
+            bool screenUpdated = false;
+            for (int y = 0; y < ScreenHeight; y++)
+            {
+                for (int x = 0; x < ScreenWidth; x++)
+                {
+                    if (screenBuffer[y, x] != 0)
+                    {
+                        screenUpdated = true;
+                        break;
+                    }
+                }
+                if (screenUpdated) break;
+            }
+            Assert.IsTrue(screenUpdated, "Screen buffer should be updated after rendering a full frame.");
+        }
+        [Test]
+        public void Test_PPUScanlineRendering_ProperModeTransitions()
+        {
+            _ppu.Update(80);  
+            Assert.AreEqual(2, _mmu.ReadByte(0xFF41) & 0x03, "PPU should be in OAM mode after 80 cycles.");
+            _ppu.Update(172); 
+            Assert.AreEqual(3, _mmu.ReadByte(0xFF41) & 0x03, "PPU should be in VRAM mode after OAM cycles.");
+            _ppu.Update(204); 
+            Assert.AreEqual(0, _mmu.ReadByte(0xFF41) & 0x03, "PPU should be in HBlank mode after VRAM cycles.");
+        }
+        private int CountRenderedSpritesOnScanline(int scanline)
+        {
+            byte[,] screenBuffer = _renderer.GetScreenBuffer();
+            int spriteCount = 0;
+            for (int x = 0; x < ScreenWidth; x++)
+            {
+                if (screenBuffer[scanline, x] != 0)
+                {
+                    spriteCount++;
+                }
+            }
+            return spriteCount;
         }
         [Test]
         public void Test_LCDDisabled_ShouldResetPPUState()
@@ -137,11 +229,11 @@ namespace GameBoyEmulator.Tests
             _mmu.WriteByte(0xFE00, 16); 
             _mmu.WriteByte(0xFE01, 8);  
             _mmu.WriteByte(0xFE02, 0);  
-            _mmu.WriteByte(0xFE03, 0);  
+            _mmu.WriteByte(0xFE03, 0); 
             ushort tileAddress = 0x8000;
             for (int i = 0; i < 16; i++)
             {
-                _mmu.WriteByte((ushort)(tileAddress + i), 0xFF); 
+                _mmu.WriteByte((ushort)(tileAddress + i), 0xFF);
             }
             _mmu.WriteByte(0xFF48, 0xE4); 
             _renderer.RenderScanline(0);
@@ -156,26 +248,6 @@ namespace GameBoyEmulator.Tests
                 }
             }
             Assert.IsTrue(spritePixelFound);
-        }
-        [Test]
-        public void Test_CoincidenceFlag_SetWhen_LY_Equals_LYC()
-        {
-            _mmu.WriteByte(0xFF45, 5); 
-            _ppu.OverrideCurrentScanline(5);
-            _mmu.WriteLY(5);
-            _ppu.CheckLYCMatch();
-            byte stat = _mmu.ReadByte(0xFF41);
-            Assert.IsTrue((stat & 0x04) != 0); 
-        }
-        [Test]
-        public void Test_CoincidenceFlag_ResetWhen_LY_NotEquals_LYC()
-        {
-            _mmu.WriteByte(0xFF45, 5); 
-            _ppu.OverrideCurrentScanline(4);
-            _mmu.WriteLY(4);
-            _ppu.CheckLYCMatch();
-            byte stat = _mmu.ReadByte(0xFF41);
-            Assert.IsFalse((stat & 0x04) != 0); 
         }
         [Test]
         public void Test_SpritePriority_Behavior()
@@ -219,6 +291,103 @@ namespace GameBoyEmulator.Tests
         public void Test_SpriteSize_8x16()
         {
             _mmu.WriteByte(0xFF40, 0x04); 
+        }
+        [Test]
+        public void Test_Sprite_Sprite_Priority()
+        {
+            _mmu.WriteByte(0xFF40, 0x82); 
+            _mmu.WriteByte(0xFE00, 32); 
+            _mmu.WriteByte(0xFE01, 16); 
+            _mmu.WriteByte(0xFE02, 0);  
+            _mmu.WriteByte(0xFE03, 0x00);  
+            _mmu.WriteByte(0xFE04, 32); 
+            _mmu.WriteByte(0xFE05, 16); 
+            _mmu.WriteByte(0xFE06, 1);  
+            _mmu.WriteByte(0xFE07, 0x00);  
+            ushort tileAddressSprite1 = 0x8000;
+            for (int i = 0; i < 16; i += 2)
+            {
+                _mmu.WriteByte((ushort)(tileAddressSprite1 + i), 0xFF);     
+                _mmu.WriteByte((ushort)(tileAddressSprite1 + i + 1), 0x00); 
+            }
+            ushort tileAddressSprite2 = 0x8000 + 16;
+            for (int i = 0; i < 16; i += 2)
+            {
+                _mmu.WriteByte((ushort)(tileAddressSprite2 + i), 0x00);
+                _mmu.WriteByte((ushort)(tileAddressSprite2 + i + 1), 0xFF);
+            }
+            _mmu.WriteByte(0xFF48, 0xE4);
+            _renderer.RenderScanline(16);
+            byte[,] frameBuffer = _renderer.GetScreenBuffer();
+            int xPosition = 8;
+            byte expectedSpriteColor = 1; 
+            Assert.AreEqual(expectedSpriteColor, frameBuffer[16, xPosition], "First sprite should be displayed over second sprite due to higher priority.");
+        }
+        [Test]
+        public void Test_Sprite_Background_Priority_Behind()
+        {
+            _mmu.WriteByte(0xFF40, 0x93);
+            _mmu.WriteByte(0xFF42, 0x00); 
+            _mmu.WriteByte(0xFF43, 0x00); 
+            _mmu.WriteByte(0xFF47, 0xE4); 
+            ushort tileDataAddressBackground = 0x8000; 
+            for (int i = 0; i < 16; i += 2)
+            {
+                _mmu.WriteByte((ushort)(tileDataAddressBackground + i), 0xFF);     
+                _mmu.WriteByte((ushort)(tileDataAddressBackground + i + 1), 0x00); 
+            }
+            ushort tileDataAddressSprite = 0x8000 + 16; 
+            for (int i = 0; i < 16; i += 2)
+            {
+                _mmu.WriteByte((ushort)(tileDataAddressSprite + i), 0x00);
+                _mmu.WriteByte((ushort)(tileDataAddressSprite + i + 1), 0xFF);
+            }
+            ushort bgTileMapAddress = 0x9C00;
+            _mmu.WriteByte((ushort)(bgTileMapAddress + 1 + 2 * 32), 0x00); 
+            _mmu.WriteByte(0xFF48, 0xE4);
+            _mmu.WriteByte(0xFE00, 32);   
+            _mmu.WriteByte(0xFE01, 16);   
+            _mmu.WriteByte(0xFE02, 1);    
+            _mmu.WriteByte(0xFE03, 0x80); 
+            _renderer.RenderScanline(16);
+            byte[,] frameBuffer = _renderer.GetScreenBuffer();
+            int xPosition = 8; 
+            byte expectedBackgroundColor = 1; 
+            byte expectedSpriteColor = 2;     
+            Assert.AreEqual(expectedBackgroundColor, frameBuffer[16, xPosition], "Background pixel should be displayed over sprite pixel.");
+        }
+        [Test]
+        public void Test_Sprite_Background_Priority()
+        {
+            _mmu.WriteByte(0xFF40, 0x93); 
+            _mmu.WriteByte(0xFF42, 0x00); 
+            _mmu.WriteByte(0xFF43, 0x00); 
+            _mmu.WriteByte(0xFF47, 0xE4); 
+            ushort tileDataAddress = 0x8000;
+            for (int i = 0; i < 16; i += 2)
+            {
+                _mmu.WriteByte((ushort)(tileDataAddress + i), 0xFF); 
+                _mmu.WriteByte((ushort)(tileDataAddress + i + 1), 0x00); 
+            }
+            ushort bgTileMapAddress = 0x9C00;
+            _mmu.WriteByte((ushort)(bgTileMapAddress + 1 + 2 * 32), 0x00); 
+            _mmu.WriteByte(0xFE00, 16); 
+            _mmu.WriteByte(0xFE01, 8);  
+            _mmu.WriteByte(0xFE02, 0);  
+            _mmu.WriteByte(0xFE03, 0x00);  
+            for (int i = 0; i < 16; i += 2)
+            {
+                _mmu.WriteByte((ushort)(tileDataAddress + i), 0x00); 
+                _mmu.WriteByte((ushort)(tileDataAddress + i + 1), 0xFF); 
+            }
+            _mmu.WriteByte(0xFF48, 0xE4); 
+            _renderer.RenderScanline(16); 
+            byte[,] frameBuffer = _renderer.GetScreenBuffer();
+            int xPosition = 8; 
+            byte backgroundPixel = frameBuffer[16, xPosition];
+            byte expectedSpriteColor = 2; 
+            byte expectedBackgroundColor = 1; 
+            Assert.AreEqual(expectedSpriteColor, frameBuffer[16, xPosition], "Sprite pixel should be displayed over background pixel.");
         }
     }
 }

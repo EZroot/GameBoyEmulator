@@ -1,3 +1,4 @@
+using System;
 namespace GameBoyEmulator
 {
     class Program
@@ -16,15 +17,8 @@ namespace GameBoyEmulator
                 Console.WriteLine("Enter the path to the Game Boy ROM file:");
                 romPath = Console.ReadLine();
             }
-            if (System.IO.File.Exists(romPath))
-            {
-                emulator.LoadROM(romPath);
-                emulator.Run();
-            }
-            else
-            {
-                Console.WriteLine("ROM file not found.");
-            }
+            emulator.LoadROM(romPath);
+            emulator.Run();
         }
     }
 }

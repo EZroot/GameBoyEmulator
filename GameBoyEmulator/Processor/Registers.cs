@@ -1,4 +1,5 @@
 using GameBoyEmulator.Debug;
+using System;
 namespace GameBoyEmulator.Processor
 {
     public class Registers
@@ -12,8 +13,6 @@ namespace GameBoyEmulator.Processor
         public bool IME;
         public bool Halted;
         public bool EI_Scheduled = false;
-        public bool DebugMode = false;
-        public bool DebugModeFlag = false;
         public Registers()
         {
             Reset();
@@ -185,63 +184,13 @@ namespace GameBoyEmulator.Processor
             H = (byte)(val >> 8);
             L = (byte)(val & 0xFF);
         }
-        public void SetZeroFlag(bool condition)
-        {
-            if (DebugMode) Console.WriteLine("Condition: " + condition);
-            if (DebugMode) Console.WriteLine($"F before setting ZeroFlag: 0x{F:X2}");
-            if (condition)
-                F |= ZeroFlag;
-            else
-                F &= (byte)(~ZeroFlag & 0xFF);
-            if (DebugMode) Console.WriteLine($"F after setting ZeroFlag: 0x{F:X2}");
-        }
-        public void ClearNegativeFlag()
-        {
-            F &= (byte)(~NegativeFlag & 0xFF);
-        }
-        public void ClearHalfCarryFlag()
-        {
-            F &= (byte)(~HalfCarryFlag & 0xFF);
-        }
-        public void ClearCarryFlag()
-        {
-            F &= (byte)(~CarryFlag & 0xFF);
-        }
-        public void SetCarryFlag(bool condition)
-        {
-            if (condition)
-                F |= CarryFlag;
-            else
-                F &= (byte)(~CarryFlag & 0xFF);
-        }
-        public void SetHalfCarryFlag(bool condition)
-        {
-            if (condition)
-                F |= HalfCarryFlag;
-            else
-                F &= (byte)(~HalfCarryFlag & 0xFF);
-        }
-        public void SetFlag(int bit, bool value)
-        {
-            if (value)
-            {
-                F |= (byte)(1 << bit);
-            }
-            else
-            {
-                F &= (byte)~(1 << bit);
-            }
-            if (DebugModeFlag)
-            {
-                Console.WriteLine($"SetFlag({bit} set to {value}). F = 0x{F:X2}");
-            }
-        }
         public void SubtractFromA(byte value)
         {
-            int result = A - value;
-            SetZeroFlag((result & 0xFF) == 0);
+            int result = (A - value) & 0xFF;
+            SetZeroFlag(result == 0);
             SetNegativeFlag(true);
-            SetHalfCarryFlag((A & 0x0F) < (value & 0x0F));
+            bool halfCarry = ((A & 0x0F) < (value & 0x0F));
+            SetHalfCarryFlag(halfCarry);
             SetCarryFlag(A < value);
             A = (byte)result;
         }
@@ -251,8 +200,8 @@ namespace GameBoyEmulator.Processor
             int result = A - value - carry;
             SetZeroFlag((result & 0xFF) == 0);
             SetNegativeFlag(true);
-            SetHalfCarryFlag((A & 0x0F) - (value & 0x0F) - carry < 0);
-            SetCarryFlag(A - carry < value);
+            SetHalfCarryFlag(((A ^ value ^ result) & 0x10) != 0);
+            SetCarryFlag(A < (value + carry));
             A = (byte)result;
         }
         public void AndWithA(byte value)
@@ -287,19 +236,72 @@ namespace GameBoyEmulator.Processor
             SetHalfCarryFlag((A & 0x0F) < (value & 0x0F));
             SetCarryFlag(A < value);
         }
+        public void SetZeroFlag(bool condition)
+        {
+            if (Debugger.IsDebugEnabled && Debugger.dWriteOutOpcode) Console.WriteLine("Condition: " + condition);
+            if (Debugger.IsDebugEnabled && Debugger.dWriteOutOpcode) Console.WriteLine($"F before setting ZeroFlag: 0x{F:X2}");
+            if (condition)
+                F |= ZeroFlag;
+            else
+                F &= (byte)(~ZeroFlag & 0xFF);
+            if (Debugger.IsDebugEnabled && Debugger.dWriteOutOpcode) Console.WriteLine($"F after setting ZeroFlag: 0x{F:X2}");
+        }
+        public void ClearNegativeFlag()
+        {
+            F &= (byte)(~NegativeFlag & 0xFF);
+        }
+        public void ClearHalfCarryFlag()
+        {
+            F &= (byte)(~HalfCarryFlag & 0xFF);
+        }
+        public void ClearCarryFlag()
+        {
+            F &= (byte)(~CarryFlag & 0xFF);
+        }
+        public void SetCarryFlag(bool condition)
+        {
+            if (condition)
+                F |= CarryFlag;
+            else
+                F &= (byte)(~CarryFlag & 0xFF);
+        }
+        public void SetHalfCarryFlag(bool condition)
+        {
+            if(Debugger.IsDebugEnabled && Debugger.dWriteOutMemoryReadWrite) Console.WriteLine($"Setting Half Carry Flag to {condition}");
+            if (condition)
+                F |= HalfCarryFlag;
+            else
+                F &= (byte)(~HalfCarryFlag & 0xFF);
+            if (Debugger.IsDebugEnabled && Debugger.dWriteOutMemoryReadWrite) Console.WriteLine($"F after setting Half Carry Flag: 0x{F:X2}");
+        }
+        public void SetFlag(int bit, bool value)
+        {
+            if (value)
+            {
+                F |= (byte)(1 << bit);
+            }
+            else
+            {
+                F &= (byte)~(1 << bit);
+            }
+            if (Debugger.IsDebugEnabled && Debugger.dWriteOutOpcode)
+            {
+                Console.WriteLine($"SetFlag({bit} set to {value}). F = 0x{F:X2}");
+            }
+        }
         public void ClearZeroFlag()
         {
             F &= (byte)(~ZeroFlag & 0xFF);
-            if (DebugMode) Console.WriteLine($"F after clearing ZeroFlag: 0x{F:X2}");
+            if (Debugger.IsDebugEnabled && Debugger.dWriteOutOpcode) Console.WriteLine($"F after clearing ZeroFlag: 0x{F:X2}");
         }
         public void SetNegativeFlag(bool condition)
         {
-            if (DebugMode) Console.WriteLine($"Setting NegativeFlag to {condition}");
+            if (Debugger.IsDebugEnabled && Debugger.dWriteOutOpcode) Console.WriteLine($"Setting NegativeFlag to {condition}");
             if (condition)
                 F |= NegativeFlag;
             else
                 F &= (byte)(~NegativeFlag & 0xFF);
-            if (DebugMode) Console.WriteLine($"F after setting NegativeFlag: 0x{F:X2}");
+            if (Debugger.IsDebugEnabled && Debugger.dWriteOutOpcode) Console.WriteLine($"F after setting NegativeFlag: 0x{F:X2}");
         }
         public bool GetZeroFlag()
         {
@@ -320,7 +322,7 @@ namespace GameBoyEmulator.Processor
         public bool IsFlagSet(byte flagMask)
         {
             bool isSet = (F & flagMask) != 0;
-            if (DebugMode) Console.WriteLine($"IsFlagSet: Checking flag 0x{flagMask:X2}, Result: {isSet}");
+            if (Debugger.IsDebugEnabled && Debugger.dWriteOutOpcode) Console.WriteLine($"IsFlagSet: Checking flag 0x{flagMask:X2}, Result: {isSet}");
             return isSet;
         }
     }

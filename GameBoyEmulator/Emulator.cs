@@ -5,6 +5,12 @@ using System.Text;
 using GameBoyEmulator.Interrupts;
 using GameBoyEmulator.Graphics;
 using GameBoyEmulator.Debug;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using System.Threading;
+using System.Linq;
+using System.IO;
 namespace GameBoyEmulator
 {
     public class Emulator
@@ -57,7 +63,7 @@ namespace GameBoyEmulator
             while (true)
             {
                 ExecuteFrame();
-                if (Debugger.dStepThroughFrame) Console.ReadKey();
+                if (Debugger.dStepThroughFrame && !Debugger.dDisableRenderFrameClearScreen) Console.ReadKey();
                 if (Debugger.dFastForward && !Debugger.dDisableRenderFrame)
                 {
                     skipFrame--;
@@ -71,6 +77,7 @@ namespace GameBoyEmulator
                 {
                     if (!Debugger.dDisableRenderFrame) RenderScreen();
                 }
+                if (Debugger.dStepThroughFrame && Debugger.dDisableRenderFrameClearScreen) Console.ReadKey();
                 if (Debugger.dFastForward) continue;
                 foreach (var key in keyMappings.Keys.ToList())
                 {
@@ -102,6 +109,24 @@ namespace GameBoyEmulator
                 if (Console.KeyAvailable)
                 {
                     var key = Console.ReadKey(intercept: true).Key;
+                    if (key == ConsoleKey.F10)
+                    {
+                        Debugger.IsDebugEnabled = true;
+                        Debugger.dWriteOutOpcode = !Debugger.dWriteOutOpcode;
+                        var t = (Debugger.dStepThroughOpcode ? "Enabled" : "Disabled");
+                        Logger.Log($"Step Through Opcode: {t}");
+                    }
+                    if (key == ConsoleKey.F12)
+                    {
+                        Debugger.IsDebugEnabled = true;
+                        Debugger.dDisableRenderFrame = !Debugger.dDisableRenderFrame;
+                        var t = (Debugger.dDisableRenderFrame ? "Disabled" : "Enabled");
+                        Logger.Log($"Render Frame: {t}");
+                    }
+                    if(key == ConsoleKey.F8)
+                    {
+                        Debugger.dStepOutModeFlag = true;
+                    }
                     if (keyMappings.ContainsKey(key))
                     {
                         keyMappings[key] = (keyMappings[key].buttonIndex, true, 10);
@@ -124,7 +149,7 @@ namespace GameBoyEmulator
                 }
                 outputBuilder.AppendLine();
             }
-            Console.Clear();
+            if(!Debugger.dDisableRenderFrameClearScreen) Console.Clear();
             Console.Write(outputBuilder.ToString());
         }
         private char GetCharForPixel(byte pixelValue)
@@ -179,10 +204,11 @@ namespace GameBoyEmulator
         }
         public void LoadROM(string filePath)
         {
-            if (!File.Exists(filePath))
+            while (!File.Exists(filePath))
             {
                 Console.WriteLine($"ROM file not found: {filePath}");
-                Environment.Exit(1);
+                Console.WriteLine("Enter the path to the Game Boy ROM file:");
+                filePath = Console.ReadLine();
             }
             byte[] romData = File.ReadAllBytes(filePath);
             if (!VerifyNintendoLogo(romData))
@@ -194,7 +220,6 @@ namespace GameBoyEmulator
             int romSize = GetROMSize(romSizeCode, romData);
             Console.WriteLine($"ROM loaded: {romData.Length} bytes into memory.");
             Console.WriteLine($"ROM size from header: {romSize / 1024} KB");
-            Thread.Sleep(5000);
             _memoryMap.LoadROM(romData);
         }
         private int GetROMSize(int romSizeCode, byte[] romData)

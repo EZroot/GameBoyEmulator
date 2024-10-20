@@ -1,3 +1,5 @@
+using GameBoyEmulator.Debug;
+using System;
 namespace GameBoyEmulator.Memory
 {
     public class RAM
@@ -9,6 +11,15 @@ namespace GameBoyEmulator.Memory
         }
         public byte ReadByte(ushort address)
         {
+            if (Debugger.dBlarrgsTestPrintCpuInstrs)
+            {
+                if (_memory[0xff02] == 0x81)
+                {
+                    char c = (char)_memory[0xff01];
+                    Logger.Log($"<color=white>{c}");
+                    _memory[0xff02] = 0x0;
+                }
+            }
             return _memory[address];
         }
         public void WriteByte(ushort address, byte value)

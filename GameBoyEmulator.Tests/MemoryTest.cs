@@ -32,6 +32,7 @@ namespace GameBoyEmulator.Tests
             _opcode = new Opcode(_registers, _mmu, _ram);
             _interruptController = new InterruptController(_registers, _mmu, _ram);
             _cpu = new CPU(_registers, _opcode, _ram, _interruptController);
+            GameBoyEmulator.Debug.Debugger.EnableDebugModeForTests();
         }
         [Test]
         public void Test_RAM_ReadWriteByte()

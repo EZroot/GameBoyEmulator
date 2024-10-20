@@ -1,9 +1,6 @@
+using GameBoyEmulator.Debug;
 using GameBoyEmulator.Memory;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 namespace GameBoyEmulator.Graphics
 {
     internal class Sprite
@@ -13,7 +10,7 @@ namespace GameBoyEmulator.Graphics
         {
             _mmu = mmu;
         }
-        public void RenderSprites(int currentScanline, byte[,] frameBuffer)
+        public void RenderSprites(int currentScanline, byte[,] frameBuffer, bool[,] spriteBuffer)
         {
             byte lcdc = _mmu.ReadByte(0xFF40);
             if ((lcdc & 0x02) == 0)
@@ -29,12 +26,12 @@ namespace GameBoyEmulator.Graphics
                 byte attributes = _mmu.ReadByte((ushort)(spriteBaseAddress + 3));
                 if (currentScanline >= spriteY && currentScanline < spriteY + spriteHeight)
                 {
-                    RenderSpriteLine(spriteX, spriteY, tileIndex, attributes, currentScanline, frameBuffer, spriteHeight);
+                    RenderSpriteLine(spriteX, spriteY, tileIndex, attributes, currentScanline, frameBuffer, spriteBuffer, spriteHeight);
                     spritesDrawn++;
                 }
             }
         }
-        private void RenderSpriteLine(int spriteX, int spriteY, byte tileIndex, byte attributes, int currentScanline, byte[,] frameBuffer, int spriteHeight)
+        private void RenderSpriteLine(int spriteX, int spriteY, byte tileIndex, byte attributes, int currentScanline, byte[,] frameBuffer, bool[,] spriteBuffer, int spriteHeight)
         {
             int tileRow = currentScanline - spriteY;
             if ((attributes & 0x40) != 0) 
@@ -43,7 +40,7 @@ namespace GameBoyEmulator.Graphics
             }
             if (spriteHeight == 16)
             {
-                tileIndex &= 0xFE;
+                tileIndex &= 0xFE; 
             }
             ushort tileAddress = (ushort)(0x8000 + tileIndex * 16);
             byte byte1 = _mmu.ReadByte((ushort)(tileAddress + tileRow * 2));
@@ -61,14 +58,23 @@ namespace GameBoyEmulator.Graphics
                 byte lowBit = (byte)((byte1 >> (7 - tilePixelX)) & 1);
                 byte highBit = (byte)((byte2 >> (7 - tilePixelX)) & 1);
                 byte pixelValue = (byte)((highBit << 1) | lowBit);
-                if (pixelValue == 0) 
-                    continue;
+                if (pixelValue == 0)
+                    continue; 
+                if (spriteBuffer[currentScanline, screenX])
+                    continue; 
                 if ((attributes & 0x80) != 0 && frameBuffer[currentScanline, screenX] != 0)
                     continue; 
                 byte obp = (attributes & 0x10) != 0 ? _mmu.ReadByte(0xFF49) : _mmu.ReadByte(0xFF48);
                 byte colorNumber = pixelValue;
                 int color = (obp >> (colorNumber * 2)) & 0x03;
                 frameBuffer[currentScanline, screenX] = (byte)color;
+                spriteBuffer[currentScanline, screenX] = true;
+                if (Debugger.IsDebugEnabled && Debugger.dDebugPPU)
+                {
+                    Console.WriteLine($"Rendering pixel at X={screenX}, Y={currentScanline}");
+                    Console.WriteLine($"Sprite Pixel: {pixelValue}");
+                    Console.WriteLine($"Sprite Attributes: {attributes:X2}");
+                }
             }
         }
     }

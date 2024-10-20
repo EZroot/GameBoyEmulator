@@ -26,7 +26,7 @@ namespace GameBoyEmulator.Graphics
         {
             byte lcdc = _mmu.ReadByte(0xFF40);
             ushort tileAddress;
-            if ((lcdc & 0x10) != 0) 
+            if ((lcdc & 0x10) != 0)
             {
                 tileAddress = (ushort)(0x8000 + tileIndex * 16);
             }

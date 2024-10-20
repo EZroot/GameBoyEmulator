@@ -1,6 +1,7 @@
 using GameBoyEmulator.Processor;
 using GameBoyEmulator.Debug;
 using GameBoyEmulator.Memory;
+using System;
 namespace GameBoyEmulator.Interrupts
 {
     public class InterruptController
@@ -20,14 +21,18 @@ namespace GameBoyEmulator.Interrupts
         {
             byte interruptEnable = _memory.ReadByte(0xFFFF);
             byte interruptFlags = _memory.ReadByte(0xFF0F);
-            byte requestedInterrupts = (byte)(interruptEnable & interruptFlags);
+            byte requestedInterrupts = (byte)(interruptEnable & interruptFlags); 
             if (requestedInterrupts == 0)
             {
-                return 0;
+                return 0; 
+            }
+            if (_register.Halted)
+            {
+                _register.Halted = false;
             }
             if (_register.IME)
             {
-                _register.IME = false;
+                _register.IME = false; 
                 _register.Halted = false; 
                 if ((requestedInterrupts & InterruptFlags.VBlank) != 0)
                 {
@@ -55,20 +60,16 @@ namespace GameBoyEmulator.Interrupts
                     return InterruptHandlingCycles;
                 }
             }
-            else if (_register.Halted)
-            {
-                _register.Halted = false;
-            }
-            return 0;
+            return 0; 
         }
         private void HandleInterrupt(byte interruptBit, ushort interruptAddress)
         {
             byte interruptFlagsReg = _memory.ReadByte(0xFF0F);
-            interruptFlagsReg &= (byte)~interruptBit;
+            interruptFlagsReg &= (byte)~interruptBit; 
             _memory.WriteByte(0xFF0F, interruptFlagsReg);
             _mmu.PushStack(_register.PC);
             _register.PC = interruptAddress;
-            if (_register.DebugMode)
+            if (Debugger.IsDebugEnabled && Debugger.dWriteOutMemoryReadWrite)
             {
                 Console.WriteLine($"[DEBUG] Interrupt handled: 0x{interruptAddress:X4}");
             }

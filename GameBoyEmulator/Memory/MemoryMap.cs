@@ -1,3 +1,5 @@
+using System;
+using System.Threading;
 namespace GameBoyEmulator.Memory
 {
     public class MemoryMap

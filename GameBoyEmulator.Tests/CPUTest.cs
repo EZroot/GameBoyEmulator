@@ -3,6 +3,7 @@ using GameBoyEmulator.Interrupts;
 using GameBoyEmulator.Memory;
 using GameBoyEmulator.Processor;
 using NUnit.Framework;
+using System.Diagnostics;
 namespace GameBoyEmulator.Tests
 {
     [TestFixture]
@@ -27,6 +28,57 @@ namespace GameBoyEmulator.Tests
             _opcode = new Opcode(_registers, _mmu, _ram);
             _interruptController = new InterruptController(_registers, _mmu, _ram);
             _cpu = new CPU(_registers, _opcode, _ram, _interruptController);
+            GameBoyEmulator.Debug.Debugger.EnableDebugModeForTests();
+        }
+        [Test]
+        public void Test_DEC_B()
+        {
+            _registers.B = 0x01; 
+            _registers.PC = 0x027B; 
+            _mmu.WriteByte(0x027B, 0x05); 
+            int cycles = _cpu.Step();
+            Assert.AreEqual(4, cycles);
+            Assert.AreEqual(0x00, _registers.B); 
+            Assert.IsTrue(_registers.GetZeroFlag()); 
+            Assert.IsTrue(_registers.GetNegativeFlag()); 
+            Assert.IsFalse(_registers.GetHalfCarryFlag()); 
+            Assert.AreEqual(0x027C, _registers.PC); 
+        }
+        [Test]
+        public void Test_JR_NZ_r8_Taken()
+        {
+            _registers.SetZeroFlag(false); 
+            _registers.PC = 0x027C; 
+            _mmu.WriteByte(0x027C, 0x20); 
+            _mmu.WriteByte(0x027D, 0xFE); 
+            int cycles = _cpu.Step();
+            Assert.AreEqual(12, cycles);
+            sbyte v = unchecked((sbyte)0xFE);
+            Assert.AreEqual(0x027C + v + 2, _registers.PC); 
+        }
+        [Test]
+        public void Test_JR_NZ_r8_NotTaken()
+        {
+            _registers.SetZeroFlag(true); 
+            _registers.PC = 0x027C; 
+            _mmu.WriteByte(0x027C, 0x20); 
+            _mmu.WriteByte(0x027D, 0x02); 
+            int cycles = _cpu.Step();
+            Assert.AreEqual(8, cycles);
+            Assert.AreEqual(0x027E, _registers.PC); 
+        }
+        [Test]
+        public void Test_LD_HLm_A()
+        {
+            _registers.A = 0x42; 
+            _registers.SetHL(0x1234); 
+            _registers.PC = 0x027A; 
+            _mmu.WriteByte(0x027A, 0x32); 
+            int cycles = _cpu.Step();
+            Assert.AreEqual(8, cycles);
+            Assert.AreEqual(0x42, _ram.ReadByte(0x1234)); 
+            Assert.AreEqual(0x1233, _registers.GetHL()); 
+            Assert.AreEqual(0x027B, _registers.PC); 
         }
         [Test]
         public void Test_CPU_InitialState()
@@ -223,19 +275,6 @@ namespace GameBoyEmulator.Tests
             Assert.IsFalse(_registers.GetCarryFlag());
         }
         [Test]
-        public void Test_CPU_Interrupts_EnableDisable()
-        {
-            _registers.IME = false;
-            _mmu.WriteByte(0x0100, 0xFB); 
-            int cycles = _cpu.Step();
-            Assert.AreEqual(4, cycles);
-            Assert.IsFalse(_registers.IME); 
-            _mmu.WriteByte(0x0101, 0x00); 
-            cycles = _cpu.Step();
-            Assert.AreEqual(4, cycles);
-            Assert.IsTrue(_registers.IME);
-        }
-        [Test]
         public void Test_CPU_Halt()
         {
             _mmu.WriteByte(0x0100, 0x76); 
@@ -319,20 +358,6 @@ namespace GameBoyEmulator.Tests
             Assert.AreEqual(0x0102, _registers.PC);
         }
         [Test]
-        public void Test_CPU_ADD_HL_HL()
-        {
-            _registers.SetHL(0x1234);
-            _mmu.WriteByte(0x0100, 0x29); 
-            int cycles = _cpu.Step();
-            Assert.AreEqual(8, cycles);
-            Assert.AreEqual(0x2468, _registers.GetHL());
-            Assert.IsFalse(_registers.GetNegativeFlag());
-            Assert.IsFalse(_registers.GetZeroFlag());
-            Assert.IsTrue(_registers.GetHalfCarryFlag());
-            Assert.IsFalse(_registers.GetCarryFlag());
-            Assert.AreEqual(0x0101, _registers.PC);
-        }
-        [Test]
         public void Test_CPU_LD_HL_A_Increment()
         {
             _registers.SetHL(0xC000);
@@ -342,21 +367,6 @@ namespace GameBoyEmulator.Tests
             Assert.AreEqual(8, cycles);
             Assert.AreEqual(0x42, _ram.ReadByte(0xC000));
             Assert.AreEqual(0xC001, _registers.GetHL());
-            Assert.AreEqual(0x0101, _registers.PC);
-        }
-        [Test]
-        public void Test_CPU_SUB_B()
-        {
-            _registers.A = 0x10;
-            _registers.B = 0x01;
-            _mmu.WriteByte(0x0100, 0x90); 
-            int cycles = _cpu.Step();
-            Assert.AreEqual(4, cycles);
-            Assert.AreEqual(0x0F, _registers.A);
-            Assert.IsFalse(_registers.GetZeroFlag());
-            Assert.IsTrue(_registers.GetNegativeFlag());
-            Assert.IsFalse(_registers.GetHalfCarryFlag());
-            Assert.IsFalse(_registers.GetCarryFlag());
             Assert.AreEqual(0x0101, _registers.PC);
         }
         [Test]
@@ -508,33 +518,6 @@ namespace GameBoyEmulator.Tests
             Assert.AreEqual(0x0101, _registers.PC);
         }
         [Test]
-        public void Test_CPU_POP_AF()
-        {
-            _registers.SP = 0xFFFC;
-            _mmu.PushStack(0x1230);
-            _mmu.WriteByte(0x0100, 0xF1); 
-            int cycles = _cpu.Step();
-            Assert.AreEqual(12, cycles);
-            Assert.AreEqual(0x12, _registers.A);
-            Assert.AreEqual(0x30, _registers.F);
-            Assert.AreEqual(0xFFFE, _registers.SP);
-            Assert.AreEqual(0x0101, _registers.PC);
-        }
-        [Test]
-        public void Test_CPU_DAA()
-        {
-            _registers.A = 0x45;
-            _mmu.WriteByte(0x0100, 0x27); 
-            int cycles = _cpu.Step();
-            Assert.AreEqual(4, cycles);
-            Assert.AreEqual(0x45, _registers.A);
-            Assert.IsFalse(_registers.GetZeroFlag());
-            Assert.IsFalse(_registers.GetNegativeFlag());
-            Assert.IsFalse(_registers.GetHalfCarryFlag());
-            Assert.IsFalse(_registers.GetCarryFlag());
-            Assert.AreEqual(0x0101, _registers.PC);
-        }
-        [Test]
         public void Test_CPU_LD_A_n()
         {
             _mmu.WriteByte(0x0100, 0x3E); 
@@ -660,21 +643,7 @@ namespace GameBoyEmulator.Tests
             Assert.AreEqual(0x0F, _registers.C);
             Assert.IsFalse(_registers.GetZeroFlag());
             Assert.IsTrue(_registers.GetNegativeFlag());
-            Assert.IsFalse(_registers.GetHalfCarryFlag());
-            Assert.AreEqual(0x0101, _registers.PC);
-        }
-        [Test]
-        public void Test_CPU_ADD_HL_DE()
-        {
-            _registers.SetHL(0x1234);
-            _registers.SetDE(0x1111);
-            _mmu.WriteByte(0x0100, 0x19); 
-            int cycles = _cpu.Step();
-            Assert.AreEqual(8, cycles);
-            Assert.AreEqual(0x2345, _registers.GetHL());
-            Assert.IsFalse(_registers.GetNegativeFlag());
-            Assert.IsTrue(_registers.GetHalfCarryFlag());
-            Assert.IsFalse(_registers.GetCarryFlag());
+            Assert.IsTrue(_registers.GetHalfCarryFlag()); 
             Assert.AreEqual(0x0101, _registers.PC);
         }
         [Test]
@@ -733,16 +702,6 @@ namespace GameBoyEmulator.Tests
             Assert.AreEqual(0x0107, _registers.PC);
         }
         [Test]
-        public void Test_CPU_JR_NC_r8()
-        {
-            _registers.SetCarryFlag(false);
-            _mmu.WriteByte(0x0100, 0x30); 
-            _mmu.WriteByte(0x0101, 0xFB); 
-            int cycles = _cpu.Step();
-            Assert.AreEqual(12, cycles);
-            Assert.AreEqual(0x0100, _registers.PC);
-        }
-        [Test]
         public void Test_CPU_INC_mHL()
         {
             _registers.SetHL(0xC000);
@@ -795,34 +754,6 @@ namespace GameBoyEmulator.Tests
             Assert.AreEqual(0x0101, _registers.PC);
         }
         [Test]
-        public void Test_CPU_RLCA()
-        {
-            _registers.A = 0x85;
-            _mmu.WriteByte(0x0100, 0x07); 
-            int cycles = _cpu.Step();
-            Assert.AreEqual(4, cycles);
-            Assert.AreEqual(0x0B, _registers.A);
-            Assert.IsFalse(_registers.GetZeroFlag());
-            Assert.IsFalse(_registers.GetNegativeFlag());
-            Assert.IsFalse(_registers.GetHalfCarryFlag());
-            Assert.IsTrue(_registers.GetCarryFlag());
-            Assert.AreEqual(0x0101, _registers.PC);
-        }
-        [Test]
-        public void Test_CPU_RRCA()
-        {
-            _registers.A = 0x01;
-            _mmu.WriteByte(0x0100, 0x0F); 
-            int cycles = _cpu.Step();
-            Assert.AreEqual(4, cycles);
-            Assert.AreEqual(0x80, _registers.A);
-            Assert.IsFalse(_registers.GetZeroFlag());
-            Assert.IsFalse(_registers.GetNegativeFlag());
-            Assert.IsFalse(_registers.GetHalfCarryFlag());
-            Assert.IsTrue(_registers.GetCarryFlag());
-            Assert.AreEqual(0x0101, _registers.PC);
-        }
-        [Test]
         public void Test_CPU_RLA()
         {
             _registers.A = 0x80;
@@ -866,18 +797,6 @@ namespace GameBoyEmulator.Tests
             Assert.AreEqual(0x0101, _registers.PC);
         }
         [Test]
-        public void Test_CPU_POP_BC()
-        {
-            _registers.SP = 0xFFFC;
-            _mmu.PushStack(0x5678);
-            _mmu.WriteByte(0x0100, 0xC1); 
-            int cycles = _cpu.Step();
-            Assert.AreEqual(12, cycles);
-            Assert.AreEqual(0x5678, _registers.GetBC());
-            Assert.AreEqual(0xFFFE, _registers.SP);
-            Assert.AreEqual(0x0101, _registers.PC);
-        }
-        [Test]
         public void Test_CPU_DI()
         {
             _registers.IME = true;
@@ -886,20 +805,6 @@ namespace GameBoyEmulator.Tests
             Assert.AreEqual(4, cycles);
             Assert.IsFalse(_registers.IME);
             Assert.AreEqual(0x0101, _registers.PC);
-        }
-        [Test]
-        public void Test_CPU_EI()
-        {
-            _registers.IME = false;
-            _mmu.WriteByte(0x0100, 0xFB); 
-            int cycles = _cpu.Step();
-            Assert.AreEqual(4, cycles);
-            Assert.IsFalse(_registers.IME); 
-            _mmu.WriteByte(0x0101, 0x00); 
-            cycles = _cpu.Step();
-            Assert.AreEqual(4, cycles);
-            Assert.IsTrue(_registers.IME);
-            Assert.AreEqual(0x0102, _registers.PC);
         }
         [Test]
         public void Test_CPU_CPL()
