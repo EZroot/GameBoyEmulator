@@ -160,9 +160,29 @@ namespace GameBoyEmulator.Graphics
                 _mmu.WriteByte(0xFF0F, interruptFlags);
             }
         }
+
         public void CheckLYCMatch()
         {
+            byte ly = _mmu.ReadByte(0xFF44);
+            byte lyc = _mmu.ReadByte(0xFF4A);
+            byte stat = _mmu.ReadByte(0xFF41);
+            if (ly == lyc)
+            {
+                stat |= 0x04;
+                if ((stat & 0x40) != 0) 
+                {
+                    byte interruptFlags = _mmu.ReadByte(0xFF0F);
+                    interruptFlags |= InterruptFlags.LCDSTAT;
+                    _mmu.WriteByte(0xFF0F, interruptFlags);
+                }
+            }
+            else
+            {
+                stat &= 0xFB; 
+            }
+            _mmu.WriteByte(0xFF41, stat);
         }
+
         private void TriggerVBlank()
         {
             byte interruptFlags = _mmu.ReadByte(0xFF0F);
