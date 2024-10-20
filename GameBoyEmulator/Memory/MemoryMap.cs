@@ -1,14 +1,12 @@
-﻿namespace GameBoyEmulator.Memory
+namespace GameBoyEmulator.Memory
 {
     public class MemoryMap
     {
         private readonly RAM _ram;
-
         public MemoryMap(RAM ram)
         {
             _ram = ram;
         }
-
         public void LoadROM(byte[] romData)
         {
             if (romData.Length > 0x8000)

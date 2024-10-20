@@ -1,6 +1,5 @@
-﻿using GameBoyEmulator.Interrupts;
+using GameBoyEmulator.Interrupts;
 using GameBoyEmulator.Memory;
-
 namespace GameBoyEmulator.Graphics
 {
     public class PPU
@@ -15,20 +14,16 @@ namespace GameBoyEmulator.Graphics
         private readonly MMU _mmu;
         private readonly Renderer _renderer;
         private bool _lcdEnabledLastUpdate = false;
-
         public PPU(MMU mmu, Renderer renderer)
         {
             _mmu = mmu;
             _renderer = renderer;
         }
-        // Inside the PPU class
-
         public void Update(int cpuCycles)
         {
             _cycles += cpuCycles;
             byte lcdc = _mmu.ReadByte(0xFF40);
-            bool lcdEnabled = (lcdc & 0x80) != 0; // LCD Display Enable
-
+            bool lcdEnabled = (lcdc & 0x80) != 0; 
             if (!lcdEnabled)
             {
                 _cycles = 0;
@@ -39,18 +34,14 @@ namespace GameBoyEmulator.Graphics
             }
             else if (!_lcdEnabledLastUpdate && lcdEnabled)
             {
-                // LCD just turned on
                 _cycles = 0;
                 CurrentScanline = 0;
                 SetLCDMode(2);
             }
-
             _lcdEnabledLastUpdate = lcdEnabled;
-
-            while (_cycles > 0) // Changed from _cycles >= 0 to _cycles > 0
+            while (_cycles > 0) 
             {
                 int mode = _mmu.ReadByte(0xFF41) & 0x03;
-
                 if (CurrentScanline < VBlankScanline)
                 {
                     if (mode == 2)
@@ -133,50 +124,42 @@ namespace GameBoyEmulator.Graphics
                 }
             }
         }
-
         private void SetLCDMode(int mode)
         {
             byte stat = _mmu.ReadByte(0xFF41);
             stat = (byte)((stat & 0xFC) | (mode & 0x03));
             _mmu.WriteByte(0xFF41, stat);
-
             bool requestInterrupt = false;
             switch (mode)
             {
                 case 0:
-                    if ((stat & 0x08) != 0) requestInterrupt = true; // H-Blank Interrupt
+                    if ((stat & 0x08) != 0) requestInterrupt = true; 
                     break;
                 case 1:
-                    if ((stat & 0x10) != 0) requestInterrupt = true; // V-Blank Interrupt
+                    if ((stat & 0x10) != 0) requestInterrupt = true; 
                     break;
                 case 2:
-                    if ((stat & 0x20) != 0) requestInterrupt = true; // OAM Interrupt
+                    if ((stat & 0x20) != 0) requestInterrupt = true; 
                     break;
             }
-
             if (requestInterrupt)
             {
-                // Set the LCD STAT interrupt flag in 0xFF0F
                 byte interruptFlags = _mmu.ReadByte(0xFF0F);
                 interruptFlags |= InterruptFlags.LCDSTAT;
                 _mmu.WriteByte(0xFF0F, interruptFlags);
             }
         }
-
         public void CheckLYCMatch()
         {
             byte ly = _mmu.ReadByte(0xFF44);
             byte lyc = _mmu.ReadByte(0xFF45);
             byte stat = _mmu.ReadByte(0xFF41);
-
             if (ly == lyc)
             {
-                stat |= 0x04; // Set coincidence flag
+                stat |= 0x04; 
                 _mmu.WriteByte(0xFF41, stat);
-
-                if ((stat & 0x40) != 0) // LYC=LY Interrupt enabled
+                if ((stat & 0x40) != 0) 
                 {
-                    // Set the LCD STAT interrupt flag
                     byte interruptFlags = _mmu.ReadByte(0xFF0F);
                     interruptFlags |= InterruptFlags.LCDSTAT;
                     _mmu.WriteByte(0xFF0F, interruptFlags);
@@ -184,19 +167,16 @@ namespace GameBoyEmulator.Graphics
             }
             else
             {
-                stat &= 0xFB; // Reset coincidence flag
+                stat &= 0xFB; 
                 _mmu.WriteByte(0xFF41, stat);
             }
         }
-
         public void OverrideCurrentScanline(int scanLine)
         {
             CurrentScanline = scanLine;
         }
-
         private void TriggerVBlank()
         {
-            // Set the V-Blank interrupt flag
             byte interruptFlags = _mmu.ReadByte(0xFF0F);
             interruptFlags |= InterruptFlags.VBlank;
             _mmu.WriteByte(0xFF0F, interruptFlags);

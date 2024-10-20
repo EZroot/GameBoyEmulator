@@ -4,7 +4,7 @@ using System.Drawing;
 using System.Text;
 using GameBoyEmulator.Interrupts;
 using GameBoyEmulator.Graphics;
-
+using GameBoyEmulator.Debug;
 namespace GameBoyEmulator
 {
     public class Emulator
@@ -20,9 +20,7 @@ namespace GameBoyEmulator
         private InterruptController _interruptController;
         private Timer _timer;
         private const int CyclesPerFrame = 70224;
-        private bool DebugFrameStepThroughPerFrame = false;
-        private bool DebugFrameStepThroughPerCycle = false;
-        private bool GoFast = true; //Skips frames when renderering to speed up cpu cycles
+        private bool GoFast = true; 
         private const int ScreenWidth = 160;
         private const int ScreenHeight = 144;
         public Emulator()
@@ -43,7 +41,6 @@ namespace GameBoyEmulator
         {
             Console.WriteLine("Emulator started. Loading ROM...");
             Console.WriteLine("Starting execution...");
-            if (GoFast) Console.WriteLine("Fast mode activated!");
             Dictionary<ConsoleKey, (int buttonIndex, bool isPressed, int frameCounter)> keyMappings = new Dictionary<ConsoleKey, (int, bool, int)>
     {
         { ConsoleKey.Z, (0, false, 0) },
@@ -56,27 +53,25 @@ namespace GameBoyEmulator
         { ConsoleKey.Spacebar, (7, false, 0) }
     };
             Task.Run(() => DetectKeyPressesAsync(keyMappings));
-
             var skipFrame = 60;
             while (true)
             {
                 ExecuteFrame();
-                if (DebugFrameStepThroughPerFrame) Console.ReadKey();
-                if (GoFast)
+                if (Debugger.dStepThroughFrame) Console.ReadKey();
+                if (Debugger.dFastForward && !Debugger.dDisableRenderFrame)
                 {
                     skipFrame--;
                     if (skipFrame <= 0)
                     {
-                        if (!DebugFrameStepThroughPerFrame) RenderScreen();
+                        RenderScreen();
                         skipFrame = 1000;
                     }
                 }
                 else
                 {
-                    if (!DebugFrameStepThroughPerFrame) RenderScreen();
+                    if (!Debugger.dDisableRenderFrame) RenderScreen();
                 }
-                if (GoFast) continue;
-
+                if (Debugger.dFastForward) continue;
                 foreach (var key in keyMappings.Keys.ToList())
                 {
                     if (keyMappings[key].isPressed)
@@ -137,26 +132,6 @@ namespace GameBoyEmulator
             char[] gradient = { ' ', '░', '▒', '▓', '█' };
             return gradient[pixelValue];
         }
-
-        //    public void RenderScreenAsImage(string filename = "output.png")
-        //{
-        //    byte[,] screenBuffer = _ppu.GetScreenBuffer();
-        //    using (Bitmap bitmap = new Bitmap(ScreenWidth, ScreenHeight))
-        //    {
-        //        for (int y = 0; y < ScreenHeight; y++)
-        //        {
-        //            for (int x = 0; x < ScreenWidth; x++)
-        //            {
-        //                byte pixel = screenBuffer[y, x];
-        //                Color color = GetColorForPixel(pixel);  
-        //                bitmap.SetPixel(x, y, color);
-        //            }
-        //        }
-        //        bitmap.Save(filename);
-        //        Console.WriteLine($"Saved Render.");
-        //    }
-        //}
-
         private Color GetColorForPixel(byte pixelValue)
         {
             return pixelValue switch
@@ -171,21 +146,15 @@ namespace GameBoyEmulator
         private void ExecuteFrame()
         {
             int cycles = 0;
-            int debugSteps = 10;
             while (cycles < CyclesPerFrame)
             {
                 int stepCycles = _cpu.Step();
                 _ppu.Update(stepCycles);
                 _timer.Update(stepCycles);
                 cycles += stepCycles;
-                if (DebugFrameStepThroughPerCycle)
+                if (Debugger.dStepThroughCpuCycle)
                 {
-                    debugSteps--;
-                    if (debugSteps == 0)
-                    {
-                        Console.ReadKey();
-                        debugSteps = 10;
-                    }
+                    Console.ReadKey();
                 }
             }
         }
@@ -246,7 +215,6 @@ namespace GameBoyEmulator
                     return romData.Length;
             }
         }
-
         private bool VerifyNintendoLogo(byte[] romData)
         {
             const int logoStartAddress = 0x0104;

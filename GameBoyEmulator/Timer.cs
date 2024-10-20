@@ -1,5 +1,4 @@
 using GameBoyEmulator.Memory;
-
 namespace GameBoyEmulator
 {
     internal class Timer

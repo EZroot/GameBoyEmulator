@@ -1,5 +1,4 @@
-﻿using GameBoyEmulator.Debugger;
-
+using GameBoyEmulator.Debug;
 namespace GameBoyEmulator.Processor
 {
     public class Registers
@@ -8,22 +7,18 @@ namespace GameBoyEmulator.Processor
         public const byte NegativeFlag = 0x40;
         public const byte HalfCarryFlag = 0x20;
         public const byte CarryFlag = 0x10;
-
         public byte A, F, B, C, D, E, H, L;
         public ushort PC, SP;
         public bool IME;
         public bool Halted;
         public bool EI_Scheduled = false;
-
         public bool DebugMode = false;
         public bool DebugModeFlag = false;
-
         public Registers()
         {
             Reset();
             Logger.Log("Registers initialized.");
         }
-
         public void Reset()
         {
             PC = 0x0100;
@@ -38,7 +33,6 @@ namespace GameBoyEmulator.Processor
             L = 0x4D;
             IME = true;
         }
-
         public void Subtract(byte value)
         {
             int result = A - value;
@@ -164,7 +158,6 @@ namespace GameBoyEmulator.Processor
             SetZeroFlag(A == 0);
             ClearHalfCarryFlag();
         }
-
         public ushort GetBC()
         {
             return (ushort)((B << 8) | C);
@@ -192,8 +185,6 @@ namespace GameBoyEmulator.Processor
             H = (byte)(val >> 8);
             L = (byte)(val & 0xFF);
         }
-
-
         public void SetZeroFlag(bool condition)
         {
             if (DebugMode) Console.WriteLine("Condition: " + condition);
@@ -244,6 +235,62 @@ namespace GameBoyEmulator.Processor
             {
                 Console.WriteLine($"SetFlag({bit} set to {value}). F = 0x{F:X2}");
             }
+        }
+        public void SubtractFromA(byte value)
+        {
+            int result = A - value;
+            SetZeroFlag((result & 0xFF) == 0);
+            SetNegativeFlag(true);
+            SetHalfCarryFlag((A & 0x0F) < (value & 0x0F));
+            SetCarryFlag(A < value);
+            A = (byte)result;
+        }
+        public void SbcFromA(byte value)
+        {
+            int carry = IsFlagSet(CarryFlag) ? 1 : 0;
+            int result = A - value - carry;
+            SetZeroFlag((result & 0xFF) == 0);
+            SetNegativeFlag(true);
+            SetHalfCarryFlag((A & 0x0F) - (value & 0x0F) - carry < 0);
+            SetCarryFlag(A - carry < value);
+            A = (byte)result;
+        }
+        public void AndWithA(byte value)
+        {
+            A &= value;
+            SetZeroFlag(A == 0);
+            SetNegativeFlag(false);
+            SetHalfCarryFlag(true);
+            SetCarryFlag(false);
+        }
+        public void XorWithA(byte value)
+        {
+            A ^= value;
+            SetZeroFlag(A == 0);
+            SetNegativeFlag(false);
+            SetHalfCarryFlag(false);
+            SetCarryFlag(false);
+        }
+        public void OrWithA(byte value)
+        {
+            A |= value;
+            SetZeroFlag(A == 0);
+            SetNegativeFlag(false);
+            SetHalfCarryFlag(false);
+            SetCarryFlag(false);
+        }
+        public void CompareA(byte value)
+        {
+            int result = A - value;
+            SetZeroFlag((result & 0xFF) == 0);
+            SetNegativeFlag(true);
+            SetHalfCarryFlag((A & 0x0F) < (value & 0x0F));
+            SetCarryFlag(A < value);
+        }
+        public void ClearZeroFlag()
+        {
+            F &= (byte)(~ZeroFlag & 0xFF);
+            if (DebugMode) Console.WriteLine($"F after clearing ZeroFlag: 0x{F:X2}");
         }
         public void SetNegativeFlag(bool condition)
         {

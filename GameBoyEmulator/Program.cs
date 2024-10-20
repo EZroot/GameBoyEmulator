@@ -1,13 +1,11 @@
-﻿namespace GameBoyEmulator
+namespace GameBoyEmulator
 {
     class Program
     {
         static void Main(string[] args)
         {
             Emulator emulator = new Emulator();
-
             string romPath;
-
             if (args.Length > 0 && args[0].EndsWith(".gb", StringComparison.OrdinalIgnoreCase))
             {
                 romPath = args[0];
@@ -18,7 +16,6 @@
                 Console.WriteLine("Enter the path to the Game Boy ROM file:");
                 romPath = Console.ReadLine();
             }
-
             if (System.IO.File.Exists(romPath))
             {
                 emulator.LoadROM(romPath);

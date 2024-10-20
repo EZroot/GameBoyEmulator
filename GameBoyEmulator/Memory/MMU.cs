@@ -1,5 +1,4 @@
-﻿using GameBoyEmulator.Processor;
-
+using GameBoyEmulator.Processor;
 namespace GameBoyEmulator.Memory
 {
     public class MMU
@@ -8,25 +7,21 @@ namespace GameBoyEmulator.Memory
         private readonly Registers _registers;
         private readonly bool[] _joypadButtons = new bool[8];
         private bool debugMode;
-
         public MMU(Registers registers, RAM ram)
         {
             _ram = ram;
             _registers = registers;
         }
-
         public byte ReadByte(ushort address)
         {
             if (debugMode)
             {
                 Console.WriteLine($"[DEBUG] ReadByte called at address 0x{address:X4}");
             }
-
-            if (address == 0xFF00) // Joypad register
+            if (address == 0xFF00) 
             {
                 return GetJoypadState();
             }
-
             byte value = _ram.ReadByte(address);
             if (debugMode)
             {
@@ -34,15 +29,13 @@ namespace GameBoyEmulator.Memory
             }
             return value;
         }
-
         public void WriteByte(ushort address, byte value)
         {
             if (debugMode)
             {
                 Console.WriteLine($"[DEBUG] WriteByte called at address 0x{address:X4} with value 0x{value:X2}");
             }
-
-            if (address == 0xFF44) // Ignore writes to LY register
+            if (address == 0xFF44) 
             {
                 if (debugMode)
                 {
@@ -50,17 +43,15 @@ namespace GameBoyEmulator.Memory
                 }
                 return;
             }
-
             _ram.WriteByte(address, value);
-
-            if (address == 0xFF46) // Handle DMA transfer
+            if (address == 0xFF46) 
             {
                 HandleDMA(value);
             }
         }
         public void WriteLY(byte value)
         {
-            _ram.WriteByte(0xFF44, value); // Write to LY register
+            _ram.WriteByte(0xFF44, value); 
             if (debugMode)
             {
                 Console.WriteLine($"[DEBUG] PPU wrote LY=0x{value:X2}");
@@ -73,14 +64,12 @@ namespace GameBoyEmulator.Memory
             _registers.SP--;
             WriteByte(_registers.SP, (byte)(value & 0xFF));
         }
-
         public ushort PopStack()
         {
             ushort lowByte = ReadByte(_registers.SP++);
             ushort highByte = ReadByte(_registers.SP++);
             return (ushort)((highByte << 8) | lowByte);
         }
-
         public void HandleDMA(byte value)
         {
             ushort sourceAddress = (ushort)(value << 8);
@@ -93,15 +82,12 @@ namespace GameBoyEmulator.Memory
                 Console.WriteLine($"[DEBUG] DMA Transfer initiated from 0x{sourceAddress:X4}.");
             }
         }
-
         private byte GetJoypadState()
         {
             byte selector = _ram.ReadByte(0xFF00);
             byte state = 0xFF;
-
             bool selectButtons = (selector & 0x20) == 0;
             bool selectDirections = (selector & 0x10) == 0;
-
             if (selectDirections)
             {
                 state &= _joypadButtons[0] ? (byte)0xFE : (byte)0xFF;
@@ -118,7 +104,6 @@ namespace GameBoyEmulator.Memory
             }
             return state;
         }
-
         public void SetJoypadButtonState(int buttonIndex, bool pressed)
         {
             ValidateButtonIndex(buttonIndex);
@@ -128,7 +113,6 @@ namespace GameBoyEmulator.Memory
                 Console.WriteLine($"[DEBUG] Joypad button {(pressed ? "pressed" : "released")}: {buttonIndex}");
             }
         }
-
         private void ValidateButtonIndex(int button)
         {
             if (button < 0 || button > 7)
@@ -136,7 +120,6 @@ namespace GameBoyEmulator.Memory
                 throw new ArgumentOutOfRangeException(nameof(button), "Button index must be between 0 and 7.");
             }
         }
-
         public byte this[ushort address]
         {
             get => ReadByte(address);

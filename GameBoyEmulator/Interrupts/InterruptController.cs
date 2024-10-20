@@ -1,7 +1,6 @@
-﻿using GameBoyEmulator.Processor;
-using GameBoyEmulator.Debugger;
+using GameBoyEmulator.Processor;
+using GameBoyEmulator.Debug;
 using GameBoyEmulator.Memory;
-
 namespace GameBoyEmulator.Interrupts
 {
     public class InterruptController
@@ -10,7 +9,6 @@ namespace GameBoyEmulator.Interrupts
         private readonly MMU _mmu;
         private readonly Registers _register;
         private const int InterruptHandlingCycles = 20;
-
         public InterruptController(Registers registry, MMU mmu, RAM memory)
         {
             _memory = memory;
@@ -18,25 +16,19 @@ namespace GameBoyEmulator.Interrupts
             _mmu = mmu;
             Logger.Log("Interrupt Controller Initialized.");
         }
-
         public int HandleInterrupts()
         {
             byte interruptEnable = _memory.ReadByte(0xFFFF);
             byte interruptFlags = _memory.ReadByte(0xFF0F);
             byte requestedInterrupts = (byte)(interruptEnable & interruptFlags);
-
             if (requestedInterrupts == 0)
             {
-                // No interrupts are requested
                 return 0;
             }
-
             if (_register.IME)
             {
-                // Interrupt Master Enable is true; handle the interrupt
                 _register.IME = false;
-                _register.Halted = false; // Exit halt state
-
+                _register.Halted = false; 
                 if ((requestedInterrupts & InterruptFlags.VBlank) != 0)
                 {
                     HandleInterrupt(InterruptFlags.VBlank, 0x0040);
@@ -65,26 +57,17 @@ namespace GameBoyEmulator.Interrupts
             }
             else if (_register.Halted)
             {
-                // If CPU is halted and an interrupt is pending but IME is false, exit the halt state
                 _register.Halted = false;
             }
-
             return 0;
         }
-
         private void HandleInterrupt(byte interruptBit, ushort interruptAddress)
         {
-            // Clear the interrupt flag
             byte interruptFlagsReg = _memory.ReadByte(0xFF0F);
             interruptFlagsReg &= (byte)~interruptBit;
             _memory.WriteByte(0xFF0F, interruptFlagsReg);
-
-            // Push current PC onto the stack
             _mmu.PushStack(_register.PC);
-
-            // Jump to the interrupt vector
             _register.PC = interruptAddress;
-
             if (_register.DebugMode)
             {
                 Console.WriteLine($"[DEBUG] Interrupt handled: 0x{interruptAddress:X4}");
