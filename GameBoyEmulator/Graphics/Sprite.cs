@@ -1,6 +1,7 @@
-using GameBoyEmulator.Debug;
 using GameBoyEmulator.Memory;
+using GameBoyEmulator.Debug;
 using System;
+
 namespace GameBoyEmulator.Graphics
 {
     internal class Sprite
@@ -41,10 +42,15 @@ namespace GameBoyEmulator.Graphics
             if (spriteHeight == 16)
             {
                 tileIndex &= 0xFE; 
+                if (tileRow >= 8)
+                {
+                    tileIndex += 1;
+                    tileRow -= 8;
+                }
             }
-            ushort tileAddress = (ushort)(0x8000 + tileIndex * 16);
-            byte byte1 = _mmu.ReadByte((ushort)(tileAddress + tileRow * 2));
-            byte byte2 = _mmu.ReadByte((ushort)(tileAddress + tileRow * 2 + 1));
+            ushort tileAddress = (ushort)(0x8000 + tileIndex * 16 + tileRow * 2);
+            byte byte1 = _mmu.ReadByte(tileAddress);
+            byte byte2 = _mmu.ReadByte((ushort)(tileAddress + 1));
             for (int x = 0; x < 8; x++)
             {
                 int tilePixelX = x;
